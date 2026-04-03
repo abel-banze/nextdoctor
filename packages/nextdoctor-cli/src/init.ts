@@ -117,10 +117,26 @@ export async function runInit(args: string[]): Promise<void> {
     endpoint = result.endpoint.trim();
   }
 
+  const { installBeta } = await inquirer.prompt<{ installBeta: boolean }>([
+    {
+      type: 'confirm',
+      name: 'installBeta',
+      message: 'The nextdoctor-agent is currently in beta. Install the beta version?',
+      default: true,
+    },
+  ]);
+
+  const packageName = installBeta ? '@codebaz/nextdoctor-agent@beta' : '@codebaz/nextdoctor-agent';
+
   const packageManager = detectPackageManager(target);
   console.log(`Using package manager: ${packageManager}`);
 
-  const depCommand = packageManager === 'pnpm' ? ['add', '@codebaz/nextdoctor-agent'] : packageManager === 'yarn' ? ['add', '@codebaz/nextdoctor-agent'] : ['install', '--save', '@codebaz/nextdoctor-agent'];
+  const depCommand = packageManager === 'pnpm' 
+    ? ['add', packageName] 
+    : packageManager === 'yarn' 
+      ? ['add', packageName] 
+      : ['install', '--save', packageName];
+      
   runCommand(packageManager, depCommand, target);
 
   const instrumentationPath = path.join(target, 'instrumentation.ts');
