@@ -1,6 +1,6 @@
 {
   "name": "@codebaz/nextdoctor-agent",
-  "version": "0.1.0-beta.1",
+  "version": "0.1.1-beta.1",
   "type": "module",
   "description": "NextDoctor agent for OpenTelemetry tracing and performance monitoring",
   "main": "./dist/index.js",

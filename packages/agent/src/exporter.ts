@@ -1,5 +1,5 @@
-import type { ExportResult, SpanExporter } from '@opentelemetry/core';
-import type { ReadableSpan } from '@opentelemetry/sdk-trace-base';
+import type { ExportResult } from '@opentelemetry/core';
+import type { SpanExporter, ReadableSpan } from '@opentelemetry/sdk-trace-base';
 import type { DetectedIssue, DetectorContext } from './detectors/types.js';
 
 export interface NextDoctorExporterOptions {
