@@ -8,7 +8,7 @@ export {
   getSystemMetrics,
   getSystemHealth,
   getSystemSummary,
-} from './init';
+} from './init.js';
 
 export type {
   NextDoctorConfig,
@@ -16,45 +16,45 @@ export type {
   AgentHealth,
   RetryPolicy,
   ExporterConfig,
-} from './types';
+} from './types.js';
 
 export {
   LogLevel,
   ExporterType,
-} from './types';
+} from './types.js';
 
 export {
   withNextDoctorMonitoring,
   withNextDoctorTiming,
-} from './middleware';
+} from './middleware.js';
 
 export {
   IntelligentSampler,
   BatchProcessor,
   CircuitBreaker,
-} from './optimization';
+} from './optimization.js';
 
 export {
   SystemMonitor,
   CPUMonitor,
   MemoryMonitor,
-} from './system-monitor';
+} from './system-monitor.js';
 
 export type {
   CPUMetrics,
   MemoryMetrics,
   SystemMetrics,
-} from './system-monitor';
+} from './system-monitor.js';
 
 export {
   detectionEngine,
   ColdStartThresholdDetector,
   FetchNoCacheDetector,
   DynamicRouteCandidateDetector,
-} from './detectors/index';
+} from './detectors/index.js';
 
 export type {
   DetectorContext,
   DetectorResult,
   IssueSeverity,
-} from './detectors/types';
+} from './detectors/types.js';

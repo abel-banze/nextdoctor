@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import type { ReadableSpan } from '@opentelemetry/sdk-trace-base';
-import { DynamicRouteCandidateDetector } from '../dynamic-route-candidate.detector';
+import { DynamicRouteCandidateDetector } from '../dynamic-route-candidate.detector.js';
 
-function createMockSpan(overrides: Partial<ReadableSpan> = {}): ReadableSpan {
+function createMockSpan(overrides: Partial<ReadableSpan> & { parentSpanId?: string } = {}): ReadableSpan {
   const defaultStartTime: [number, number] = [Math.floor(Date.now() / 1000), 0];
   const defaultEndTime: [number, number] = [
     defaultStartTime[0],
@@ -78,7 +78,7 @@ describe('DynamicRouteCandidateDetector', () => {
 
     expect(issues.length).toBeGreaterThan(0);
     const issue = issues.find(i => i.id === 'DYNAMIC_ROUTE_CANDIDATE');
-    expect(issue?.severity).toBe('warning');
+    expect(issue?.severity).toBe('info');
     expect(issue?.message).toContain('cookies()');
   });
 
@@ -117,7 +117,7 @@ describe('DynamicRouteCandidateDetector', () => {
     expect(issue?.message).toContain('headers()');
   });
 
-  it('ignores cookies() with specific key access via child span', () => {
+  it('does not fire when cookies span has child spans', () => {
     const parentSpan = createMockSpan({
       spanContext: () => ({
         traceId: 'test-trace',
@@ -172,7 +172,7 @@ describe('DynamicRouteCandidateDetector', () => {
     ).toHaveLength(0);
   });
 
-  it('ignores headers() with specific key access', () => {
+  it('does not fire when headers span has child spans', () => {
     const parentSpan = createMockSpan({
       spanContext: () => ({
         traceId: 'test-trace',
@@ -358,7 +358,7 @@ describe('DynamicRouteCandidateDetector', () => {
     });
 
     expect(issues.length).toBeGreaterThan(0);
-    const issue = issues[0];
+    const issue = issues[0]!;
     expect(issue.route).toBe('/api/user');
     expect(issue.spanId).toBeDefined();
   });

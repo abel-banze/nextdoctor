@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { ReadableSpan } from '@opentelemetry/sdk-trace-base';
-import { ColdStartThresholdDetector } from '../cold-start-threshold.detector';
+import { ColdStartThresholdDetector } from '../cold-start-threshold.detector.js';
 
 function createMockSpan(overrides: Partial<ReadableSpan> = {}): ReadableSpan {
   const defaultStartTime: [number, number] = [Math.floor(Date.now() / 1000), 0];
@@ -51,10 +51,10 @@ describe('ColdStartThresholdDetector', () => {
     });
 
     expect(issues).toHaveLength(1);
-    expect(issues[0].id).toBe('COLD_START_THRESHOLD');
-    expect(issues[0].severity).toBe('critical');
-    expect(issues[0].message).toContain('1200ms');
-    expect(issues[0].message).toContain('800ms');
+    expect(issues[0]!.id).toBe('COLD_START_THRESHOLD');
+    expect(issues[0]!.severity).toBe('critical');
+    expect(issues[0]!.message).toContain('1200ms');
+    expect(issues[0]!.message).toContain('800ms');
   });
 
   it('ignores cold start below threshold', () => {
@@ -76,9 +76,9 @@ describe('ColdStartThresholdDetector', () => {
     expect(issues).toHaveLength(0);
   });
 
-  it('detects intermittent cold starts via variance', () => {
-    const spans = Array.from({ length: 10 }).map((_, i) => {
-      const durationNano = i < 5 
+  it('fires with 20+ spans when P99 - P50 > 2000ms', () => {
+    const spans = Array.from({ length: 20 }).map((_, i) => {
+      const durationNano = i < 10 
         ? 100_000_000 // 100ms (P50)
         : 2500_000_000; // 2500ms (P99)
 
@@ -111,7 +111,7 @@ describe('ColdStartThresholdDetector', () => {
   });
 
   it('ignores low variance', () => {
-    const spans = Array.from({ length: 10 }).map((_, i) =>
+    const spans = Array.from({ length: 20 }).map((_, i) =>
       createMockSpan({
         name: 'http.request',
         attributes: {
@@ -137,8 +137,8 @@ describe('ColdStartThresholdDetector', () => {
     expect(issues.filter(i => i.id === 'COLD_START_INTERMITTENT')).toHaveLength(0);
   });
 
-  it('requires minimum of 5 spans for variance check', () => {
-    const spans = Array.from({ length: 3 }).map((_, i) =>
+  it('does not fire with fewer than 20 spans for variance calculation', () => {
+    const spans = Array.from({ length: 19 }).map((_, i) =>
       createMockSpan({
         startTime: [1000, 0],
         endTime: [1000, i < 2 ? 100_000_000 : 3000_000_000],
@@ -166,8 +166,8 @@ describe('ColdStartThresholdDetector', () => {
       startupTimeMs: 1200,
     });
 
-    expect(issues[0].suggestion).toContain('import');
-    expect(issues[0].suggestion).toContain('runtime');
+    expect(issues[0]!.suggestion).toContain('import');
+    expect(issues[0]!.suggestion).toContain('runtime');
   });
 
   it('includes attributes with threshold data', () => {
@@ -176,8 +176,8 @@ describe('ColdStartThresholdDetector', () => {
       startupTimeMs: 1200,
     });
 
-    expect(issues[0].attributes?.startupTimeMs).toBe(1200);
-    expect(issues[0].attributes?.threshold).toBe(800);
-    expect(issues[0].attributes?.runtime).toBe('edge');
+    expect(issues[0]!.attributes?.startupTimeMs).toBe(1200);
+    expect(issues[0]!.attributes?.threshold).toBe(800);
+    expect(issues[0]!.attributes?.runtime).toBe('edge');
   });
 });

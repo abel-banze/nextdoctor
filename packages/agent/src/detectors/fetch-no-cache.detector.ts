@@ -74,10 +74,12 @@ export class FetchNoCacheDetector extends BaseDetector {
       noCacheFetches.push(fetchInfo);
 
       // Track for N+1 detection
-      if (!urlCounts.has(url)) {
-        urlCounts.set(url, []);
+      const existing = urlCounts.get(url);
+      if (existing) {
+        existing.push(fetchInfo);
+      } else {
+        urlCounts.set(url, [fetchInfo]);
       }
-      urlCounts.get(url)!.push(fetchInfo);
     });
 
     // Report individual fetches and group N+1s
@@ -149,6 +151,30 @@ const data = await fetch("${url}", {
           attributes: {
             url,
             duration: Math.round(fetch.duration),
+          },
+          detectedAt: Date.now(),
+        });
+      } else {
+        // 2 to nPlus1Threshold-1 calls: still suspicious
+        const totalDuration = Math.round(fetches.reduce((sum, f) => sum + f.duration, 0));
+        issues.push({
+          id: this.id,
+          severity: 'high',
+          message: `Fetch "${url}" called ${fetches.length}x with no cache → ${totalDuration}ms wasted per request`,
+          suggestion: `This endpoint is being called multiple times without caching. Consider adding a cache directive or deduplicating the request:
+
+// Option 1: Force cache
+fetch("${url}", { cache: 'force-cache' })
+
+// Option 2: Revalidate after time
+fetch("${url}", { next: { revalidate: 3600 } })`,
+          route: context.route,
+          spanId: fetches[0]?.spanId,
+          attributes: {
+            url,
+            callCount: fetches.length,
+            totalDuration,
+            avgDuration: Math.round(totalDuration / fetches.length),
           },
           detectedAt: Date.now(),
         });

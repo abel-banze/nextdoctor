@@ -6,6 +6,7 @@ export class ColdStartThresholdDetector extends BaseDetector {
   readonly id = 'COLD_START_THRESHOLD';
   readonly name = 'Cold Start Threshold Detector';
   private readonly threshold = 800; // ms
+  private readonly minSamplesForVariance = 20;
 
   detect(spans: ReadableSpan[], context: DetectorContext): DetectedIssue[] {
     const issues: DetectedIssue[] = [];
@@ -51,11 +52,11 @@ export const runtime = 'nodejs';
       ? spans.filter(s => s.attributes?.['http.route'] === context.route)
       : spans.filter(s => s.attributes?.['http.route']);
 
-    if (routeSpans.length >= 5) {
+    if (routeSpans.length >= this.minSamplesForVariance) {
       const durations = routeSpans.map(s => this.getSpanDurationMs(s));
       const sorted = [...durations].sort((a, b) => a - b);
-      const p50 = sorted[Math.floor(sorted.length * 0.5)];
-      const p99 = sorted[Math.floor(sorted.length * 0.99)];
+      const p50 = this.percentile(sorted, 50);
+      const p99 = this.percentile(sorted, 99);
       const variance = p99 - p50;
 
       if (variance > 2000) {
@@ -69,7 +70,14 @@ export const runtime = 'nodejs';
 2. Migrate to Node.js runtime if Edge Runtime is optional:
 export const runtime = 'nodejs';
 
-3. Use CloudFlare durable objects or similar for persistent execution.`,
+3. Use Next.js Middleware to keep the runtime warm — middleware runs on every
+   request and prevents full cold starts on subsequent edge invocations:
+
+// middleware.ts
+export const config = { matcher: '/api/:path*' };
+export function middleware() {
+  // Intentionally lightweight — presence keeps runtime warm
+}`,
           route: context.route,
           attributes: {
             p50: Math.round(p50),

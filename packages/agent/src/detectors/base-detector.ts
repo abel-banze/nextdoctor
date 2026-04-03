@@ -11,9 +11,9 @@ export abstract class BaseDetector {
   ): DetectedIssue[];
 
   run(spans: ReadableSpan[], context: DetectorContext): DetectorResult {
-    const start = performance.now();
+    const start = Date.now();
     const issues = this.detect(spans, context);
-    const durationMs = performance.now() - start;
+    const durationMs = Date.now() - start;
 
     return {
       issues,
@@ -48,12 +48,22 @@ export abstract class BaseDetector {
   }
 
   protected hasChildSpanWithName(parent: ReadableSpan, childName: string, allSpans: ReadableSpan[]): boolean {
+    const parentSpanId = parent.spanContext().spanId;
     return allSpans.some(
-      s => s.parentSpanId === parent.spanContext().spanId && s.name === childName
+      // @ts-expect-error parentSpanId exists in newer OTel versions
+      s => s.parentSpanId === parentSpanId && s.name === childName
     );
   }
 
   protected getChildSpans(parent: ReadableSpan, allSpans: ReadableSpan[]): ReadableSpan[] {
-    return allSpans.filter(s => s.parentSpanId === parent.spanContext().spanId);
+    const parentSpanId = parent.spanContext().spanId;
+    // @ts-expect-error parentSpanId exists in newer OTel versions
+    return allSpans.filter(s => s.parentSpanId === parentSpanId);
+  }
+
+  protected percentile(sortedAsc: number[], p: number): number {
+    if (sortedAsc.length === 0) return 0;
+    const idx = Math.ceil(sortedAsc.length * (p / 100)) - 1;
+    return sortedAsc[Math.max(0, idx)]!;
   }
 }

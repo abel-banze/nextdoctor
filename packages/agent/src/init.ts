@@ -240,7 +240,7 @@ class NextDoctorAgent {
       const route = firstSpan?.attributes?.['http.route'] || 
                    firstSpan?.attributes?.['http.url'] || 
                    'unknown';
-      const runtime = process.env.NEXT_RUNTIME || 'nodejs';
+      const runtime = (process.env.NEXT_RUNTIME || 'nodejs') as 'nodejs' | 'edge';
 
       // Calculate startup time if this is the first request
       const startupTimeMs = Date.now() - this.startTime;
@@ -248,7 +248,7 @@ class NextDoctorAgent {
       // Analyze spans with detection engine
       const detectedIssues = detectionEngine.analyzeSpans(this.spansBuffer, {
         route: String(route),
-        runtime: String(runtime),
+        runtime,
         startupTimeMs: startupTimeMs < 30000 ? startupTimeMs : undefined, // Only report first 30s
       });
 

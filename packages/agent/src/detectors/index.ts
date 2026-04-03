@@ -43,7 +43,7 @@ export class DetectionEngine {
         severityOrder[b.severity as keyof typeof severityOrder]
     );
 
-    return deduped satisfies DetectedIssue[];
+    return deduped;
   }
 
   private deduplicateIssues(issues: DetectedIssue[]): DetectedIssue[] {
@@ -114,6 +114,9 @@ export class DetectionEngine {
 }
 
 // Singleton instance
+// MVP LIMITATION: In persistent Node.js environments (self-hosted), this cache 
+// is shared globally. Deduplication keys include 'id' and 'route', but lack 
+// project-level scope, which could cause cache collisions in multi-tenant usages.
 export const detectionEngine = new DetectionEngine();
 
 // Re-export all types and detectors for public API

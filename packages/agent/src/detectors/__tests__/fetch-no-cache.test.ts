@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { ReadableSpan } from '@opentelemetry/sdk-trace-base';
-import { FetchNoCacheDetector } from '../fetch-no-cache.detector';
+import { FetchNoCacheDetector } from '../fetch-no-cache.detector.js';
 
 // Helper to create mock spans
 function createMockSpan(overrides: Partial<ReadableSpan> = {}): ReadableSpan {
@@ -58,9 +58,9 @@ describe('FetchNoCacheDetector', () => {
     const issues = detector.detect([span], { runtime: 'nodejs' });
 
     expect(issues).toHaveLength(1);
-    expect(issues[0].id).toBe('FETCH_NO_CACHE');
-    expect(issues[0].severity).toBe('high');
-    expect(issues[0].message).toContain('no cache');
+    expect(issues[0]!.id).toBe('FETCH_NO_CACHE');
+    expect(issues[0]!.severity).toBe('high');
+    expect(issues[0]!.message).toContain('no cache');
   });
 
   it('ignores POST fetch (no cache expected)', () => {
@@ -173,9 +173,36 @@ describe('FetchNoCacheDetector', () => {
     const issues = detector.detect(spans, { runtime: 'nodejs' });
 
     expect(issues).toHaveLength(1);
-    expect(issues[0].id).toBe('FETCH_NO_CACHE');
-    expect(issues[0].severity).toBe('critical');
-    expect(issues[0].message).toContain('3x');
+    expect(issues[0]!.id).toBe('FETCH_NO_CACHE');
+    expect(issues[0]!.severity).toBe('critical');
+    expect(issues[0]!.message).toContain('3x');
+  });
+
+  it('reports high severity when same URL is fetched exactly 2 times', () => {
+    const url = 'https://api.example.com/twice';
+    const spans = Array.from({ length: 2 }).map((_, i) =>
+      createMockSpan({
+        name: 'fetch',
+        attributes: {
+          'http.method': 'GET',
+          'http.url': url,
+        },
+        spanContext: () => ({
+          traceId: 'test-trace',
+          spanId: `span-${i}`,
+          traceFlags: 0x01,
+          traceState: undefined,
+          isRecording: true,
+        }),
+      })
+    );
+
+    const issues = detector.detect(spans, { runtime: 'nodejs' });
+
+    expect(issues).toHaveLength(1);
+    expect(issues[0]!.id).toBe('FETCH_NO_CACHE');
+    expect(issues[0]!.severity).toBe('high');
+    expect(issues[0]!.attributes?.callCount).toBe(2);
   });
 
   it('includes URL and duration in attributes', () => {
@@ -189,8 +216,8 @@ describe('FetchNoCacheDetector', () => {
 
     const issues = detector.detect([span], { runtime: 'nodejs' });
 
-    expect(issues[0].attributes?.url).toBe('https://api.example.com/slow');
-    expect(issues[0].attributes?.duration).toBeDefined();
+    expect(issues[0]!.attributes?.url).toBe('https://api.example.com/slow');
+    expect(issues[0]!.attributes?.duration).toBeDefined();
   });
 
   it('includes route in issue if context provides it', () => {
@@ -207,6 +234,6 @@ describe('FetchNoCacheDetector', () => {
       route: '/products',
     });
 
-    expect(issues[0].route).toBe('/products');
+    expect(issues[0]!.route).toBe('/products');
   });
 });

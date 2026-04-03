@@ -47,11 +47,13 @@ export interface NextDoctorConfig {
 
 export interface DetectedIssue {
   id: string;
-  severity: 'low' | 'medium' | 'high' | 'critical';
+  severity: 'info' | 'warning' | 'high' | 'critical';
   message: string;
   suggestion: string;
-  affected: string[];
-  metrics?: Record<string, number>;
+  route?: string;
+  spanId?: string;
+  attributes?: Record<string, unknown>;
+  detectedAt: number;
 }
 
 export interface AgentHealth {
