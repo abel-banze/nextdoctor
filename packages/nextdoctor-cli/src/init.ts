@@ -44,7 +44,7 @@ function assertNextPresent(pkgJson: any): boolean {
 }
 
 function generateInstrumentation(endpoint: string): string {
-  return `import { initNextDoctor } from '@nextdoctor/agent';
+  return `import { initNextDoctor } from '@codebaz/nextdoctor-agent';
 
 export default async function instrumentation() {
   if (process.env.NODE_ENV === 'development') return;
@@ -58,7 +58,7 @@ export default async function instrumentation() {
 }
 
 function generateConfig(endpoint: string): string {
-  return `import type { NextDoctorConfig } from '@nextdoctor/agent';
+  return `import type { NextDoctorConfig } from '@codebaz/nextdoctor-agent';
 
 const config: NextDoctorConfig = {
   projectToken: process.env.NEXTDOCTOR_PROJECT_TOKEN || 'REPLACE_ME',
@@ -120,7 +120,7 @@ export async function runInit(args: string[]): Promise<void> {
   const packageManager = detectPackageManager(target);
   console.log(`Using package manager: ${packageManager}`);
 
-  const depCommand = packageManager === 'pnpm' ? ['add', '@nextdoctor/agent'] : packageManager === 'yarn' ? ['add', '@nextdoctor/agent'] : ['install', '--save', '@nextdoctor/agent'];
+  const depCommand = packageManager === 'pnpm' ? ['add', '@codebaz/nextdoctor-agent'] : packageManager === 'yarn' ? ['add', '@codebaz/nextdoctor-agent'] : ['install', '--save', '@codebaz/nextdoctor-agent'];
   runCommand(packageManager, depCommand, target);
 
   const instrumentationPath = path.join(target, 'instrumentation.ts');
