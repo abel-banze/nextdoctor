@@ -1,7 +1,7 @@
 import { NodeSDK } from '@opentelemetry/sdk-node';
 import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentations-node';
-import { OTLPTraceExporter } from '@opentelemetry/exporter-otlp-http';
 import { trace } from '@opentelemetry/api';
+import { NextDoctorExporter } from './exporter.js';
 import type {
   NextDoctorConfig,
   ExporterType,
@@ -85,29 +85,34 @@ class NextDoctorAgent {
     }
   }
 
-  private createTraceExporter(): any {
-    const exporterConfig = (this.config.exporter || {}) as any;
-    const isVercel = exporterConfig.type === ExporterTypeEnum.VERCEL || this.isVercelEnvironment();
-
-    if (isVercel || !exporterConfig.url) {
-      this.log(LogLevelEnum.INFO, 'Using Vercel OTEL exporter');
-      return new OTLPTraceExporter({
-        url: this.config.endpoint,
-        headers: {
-          authorization: `Bearer ${this.config.projectToken}`,
-          'content-type': 'application/json',
-        },
-      } as any);
-    }
-
-    return new OTLPTraceExporter({
-      url: exporterConfig.url || this.config.endpoint,
-      headers: {
-        ...exporterConfig.headers,
-        authorization: `Bearer ${this.config.projectToken}`,
-        'content-type': 'application/json',
+  private createTraceExporter(): NextDoctorExporter {
+    return new NextDoctorExporter({
+      endpoint: this.config.endpoint,
+      projectToken: this.config.projectToken,
+      getIssues: () => this.detectedIssues,
+      clearIssues: (sent) => {
+        // Remove only the issues that were successfully flushed
+        const sentSet = new Set(sent.map(i => `${i.id}:${i.detectedAt}`));
+        this.detectedIssues = this.detectedIssues.filter(
+          i => !sentSet.has(`${i.id}:${i.detectedAt}`)
+        );
       },
-    } as any);
+      getContext: () => {
+        const firstSpan = this.spansBuffer[0];
+        const route =
+          firstSpan?.attributes?.['http.route'] ??
+          firstSpan?.attributes?.['http.url'] ??
+          undefined;
+        return {
+          route: route ? String(route) : undefined,
+          runtime: (process.env.NEXT_RUNTIME ?? 'nodejs') as 'nodejs' | 'edge',
+          startupTimeMs: Date.now() - this.startTime < 30_000
+            ? Date.now() - this.startTime
+            : undefined,
+        };
+      },
+      timeoutMs: this.config.timeout ?? 10_000,
+    });
   }
 
   private createResource(): any {
