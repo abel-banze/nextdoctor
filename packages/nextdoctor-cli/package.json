@@ -1,13 +1,12 @@
 {
   "name": "nextdoctor",
-  "version": "0.0.0",
-  "private": true,
+  "version": "0.1.0",
   "type": "module",
   "bin": {
     "nextdoctor": "./dist/index.js"
   },
   "scripts": {
-    "dev": "pnpm --filter nextdoctor-cli dev",
+    "dev": "tsc --watch",
     "build": "tsc --build",
     "test": "pnpm vitest",
     "lint": "eslint . --ext .ts"
