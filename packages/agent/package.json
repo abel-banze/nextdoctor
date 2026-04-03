@@ -1,11 +1,36 @@
 {
-  "name": "agent",
-  "version": "0.0.0",
-  "private": true,
+  "name": "@codebaz/nextdoctor-agent",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "NextDoctor agent for OpenTelemetry tracing and performance monitoring",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
   "scripts": {
-    "dev": "echo 'Add dev script here'",
-    "build": "echo 'Add build script here'",
-    "test": "echo 'Add test script here'",
-    "lint": "echo 'Add lint script here'"
+    "dev": "tsc --watch",
+    "build": "tsc --build",
+    "test": "vitest",
+    "lint": "eslint . --ext .ts"
+  },
+  "dependencies": {
+    "@opentelemetry/api": "^1.8.0",
+    "@opentelemetry/sdk-node": "^0.52.1",
+    "@opentelemetry/auto-instrumentations-node": "^0.52.1",
+    "@opentelemetry/exporter-otlp-http": "^0.52.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@workspace/typescript-config": "workspace:*",
+    "eslint": "^9.0.0",
+    "typescript": "^5.9.3",
+    "vitest": "^1.5.0"
+  },
+  "peerDependencies": {
+    "next": ">=14.0.0"
   }
 }
