@@ -5,6 +5,9 @@ export {
   reportMetric,
   getHealthStatus,
   getDetectedIssues,
+  getSystemMetrics,
+  getSystemHealth,
+  getSystemSummary,
 } from './init';
 
 export type {
@@ -30,3 +33,15 @@ export {
   BatchProcessor,
   CircuitBreaker,
 } from './optimization';
+
+export {
+  SystemMonitor,
+  CPUMonitor,
+  MemoryMonitor,
+} from './system-monitor';
+
+export type {
+  CPUMetrics,
+  MemoryMetrics,
+  SystemMetrics,
+} from './system-monitor';

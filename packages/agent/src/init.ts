@@ -11,10 +11,12 @@ import type {
   LogLevel,
 } from './types.js';
 import { LogLevel as LogLevelEnum, ExporterType as ExporterTypeEnum } from './types.js';
+import { SystemMonitor, type SystemMetrics } from './system-monitor.js';
 
 class NextDoctorAgent {
   private sdk: NodeSDK | null = null;
   private config: NextDoctorConfig;
+  private systemMonitor: SystemMonitor;
   private health: AgentHealth = {
     initialized: false,
     isHealthy: true,
@@ -51,6 +53,7 @@ class NextDoctorAgent {
     if (config.retryPolicy) {
       this.retryPolicy = { ...this.retryPolicy, ...config.retryPolicy };
     }
+    this.systemMonitor = new SystemMonitor((level, message, meta) => this.log(level, message, meta));
   }
 
   private validateConfig(config: Partial<NextDoctorConfig>): void {
@@ -279,12 +282,25 @@ class NextDoctorAgent {
     return Date.now() - this.startTime;
   }
 
+  getSystemMetrics(): SystemMetrics {
+    return this.systemMonitor.getSystemMetrics();
+  }
+
+  getSystemHealth(cpuThreshold: number = 80, memThreshold: number = 85) {
+    return this.systemMonitor.getSystemHealth(cpuThreshold, memThreshold);
+  }
+
+  getSystemSummary() {
+    return this.systemMonitor.getSummary();
+  }
+
   getStats() {
     return {
       uptime: this.getUptime(),
       initialized: this.initialized,
       health: this.getHealth(),
       detectedIssues: this.getDetectedIssues(),
+      system: this.getSystemSummary(),
     };
   }
 }
@@ -331,4 +347,26 @@ export function getHealthStatus(): AgentHealth | null {
 
 export function getDetectedIssues(): DetectedIssue[] {
   return agentInstance?.getDetectedIssues() || [];
+}
+
+export function getSystemMetrics(): SystemMetrics | null {
+  return agentInstance?.getSystemMetrics() || null;
+}
+
+export function getSystemHealth(cpuThreshold: number = 80, memThreshold: number = 85) {
+  if (!agentInstance) {
+    console.warn('NextDoctor agent not initialized, system health unavailable');
+    return null;
+  }
+
+  return agentInstance.getSystemHealth(cpuThreshold, memThreshold);
+}
+
+export function getSystemSummary() {
+  if (!agentInstance) {
+    console.warn('NextDoctor agent not initialized, system summary unavailable');
+    return null;
+  }
+
+  return agentInstance.getSystemSummary();
 }

@@ -17,6 +17,10 @@
     "./optimization": {
       "types": "./dist/optimization.d.ts",
       "import": "./dist/optimization.js"
+    },
+    "./system-monitor": {
+      "types": "./dist/system-monitor.d.ts",
+      "import": "./dist/system-monitor.js"
     }
   },
   "scripts": {
