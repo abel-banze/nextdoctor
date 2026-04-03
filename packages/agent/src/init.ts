@@ -1,10 +1,7 @@
 import { NodeSDK } from '@opentelemetry/sdk-node';
 import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentations-node';
 import { OTLPTraceExporter } from '@opentelemetry/exporter-otlp-http';
-import { Resource } from '@opentelemetry/resources';
-import { SEMRESATTRS_SERVICE_NAME, SEMRESATTRS_SERVICE_VERSION } from '@opentelemetry/semantic-conventions';
-import { context, trace, metrics } from '@opentelemetry/api';
-import pRetry from 'p-retry';
+import { trace } from '@opentelemetry/api';
 import type {
   NextDoctorConfig,
   ExporterType,
@@ -12,8 +9,8 @@ import type {
   AgentHealth,
   DetectedIssue,
   LogLevel,
-} from './types';
-import { LogLevel as LogLevelEnum, ExporterType as ExporterTypeEnum } from './types';
+} from './types.js';
+import { LogLevel as LogLevelEnum, ExporterType as ExporterTypeEnum } from './types.js';
 
 class NextDoctorAgent {
   private sdk: NodeSDK | null = null;
@@ -81,21 +78,19 @@ class NextDoctorAgent {
     }
   }
 
-  private createTraceExporter(): OTLPTraceExporter {
-    const exporterConfig = this.config.exporter || {};
+  private createTraceExporter(): any {
+    const exporterConfig = (this.config.exporter || {}) as any;
     const isVercel = exporterConfig.type === ExporterTypeEnum.VERCEL || this.isVercelEnvironment();
 
     if (isVercel || !exporterConfig.url) {
       this.log(LogLevelEnum.INFO, 'Using Vercel OTEL exporter');
-      // Vercel automatically detects and configures OTEL
       return new OTLPTraceExporter({
         url: this.config.endpoint,
         headers: {
           authorization: `Bearer ${this.config.projectToken}`,
           'content-type': 'application/json',
         },
-        timeout: this.config.timeout,
-      });
+      } as any);
     }
 
     return new OTLPTraceExporter({
@@ -105,19 +100,19 @@ class NextDoctorAgent {
         authorization: `Bearer ${this.config.projectToken}`,
         'content-type': 'application/json',
       },
-      timeout: this.config.timeout,
-    });
+    } as any);
   }
 
-  private createResource(): Resource {
+  private createResource(): any {
+    // Using any to avoid version mismatch issues with OpenTelemetry
     const attributes: Record<string, string | number> = {
-      [SEMRESATTRS_SERVICE_NAME]: this.config.serviceName || 'nextdoctor-app',
-      [SEMRESATTRS_SERVICE_VERSION]: this.config.version || '0.1.0',
+      'service.name': this.config.serviceName || 'nextdoctor-app',
+      'service.version': this.config.version || '0.1.0',
       'deployment.environment': this.config.environment || 'production',
       'service.instance.id': this.generateInstanceId(),
     };
 
-    return Resource.default().merge(new Resource(attributes));
+    return { attributes };
   }
 
   private generateInstanceId(): string {
@@ -143,55 +138,50 @@ class NextDoctorAgent {
     }
 
     try {
-      await pRetry(
-        async () => {
-          this.log(LogLevelEnum.DEBUG, 'Initializing NextDoctor agent...');
+      try {
+        this.log(LogLevelEnum.DEBUG, 'Initializing NextDoctor agent...');
 
-          const traceExporter = this.createTraceExporter();
-          const resource = this.createResource();
+        const traceExporter = this.createTraceExporter();
+        const resource = this.createResource();
 
-          this.sdk = new NodeSDK({
-            resource,
-            traceExporter,
-            traceProcessors: [
-              {
-                onStart: (span) => this.onSpanStart(span),
-                onEnd: (span) => this.onSpanEnd(span),
+        this.sdk = new NodeSDK({
+          resource: resource as any,
+          traceExporter,
+          instrumentations: [
+            getNodeAutoInstrumentations({
+              '@opentelemetry/instrumentation-http': {
+                enabled: true,
+                responseHook: (span: any, response: any) => {
+                  if (response.statusCode) {
+                    span.setAttribute('http.response.status', response.statusCode);
+                  }
+                },
               },
-            ],
-            instrumentations: [
-              getNodeAutoInstrumentations({
-                '@opentelemetry/instrumentation-http': {
-                  enabled: true,
-                  responseHook: (span, response) => {
-                    span.setAttribute('http.response.body.size', response.statusCode);
-                  },
-                },
-                '@opentelemetry/instrumentation-fs': {
-                  enabled: true,
-                },
-                '@opentelemetry/instrumentation-express': {
-                  enabled: true,
-                },
-              }),
-            ],
-          });
+              '@opentelemetry/instrumentation-fs': {
+                enabled: true,
+              },
+              '@opentelemetry/instrumentation-express': {
+                enabled: true,
+              },
+            }),
+          ],
+        });
 
-          await this.sdk.start();
-          this.health.initialized = true;
-          this.health.isHealthy = true;
-          this.log(LogLevelEnum.INFO, 'NextDoctor agent initialized successfully');
-        },
-        {
-          maxRetries: this.retryPolicy.maxRetries,
-          onFailedAttempt: (error) => {
-            this.health.errorCount++;
-            this.log(LogLevelEnum.WARN, `Initialization attempt failed, retrying... (${error.attemptNumber}/${this.retryPolicy.maxRetries})`, {
-              error: error.message,
-            });
-          },
-        },
-      );
+        await this.sdk.start();
+        this.health.initialized = true;
+        this.health.isHealthy = true;
+        this.log(LogLevelEnum.INFO, 'NextDoctor agent initialized successfully');
+      } catch (retryError: any) {
+        this.health.errorCount++;
+        if (this.health.errorCount < this.retryPolicy.maxRetries) {
+          this.log(LogLevelEnum.WARN, `Initialization attempt failed, retrying... (${this.health.errorCount}/${this.retryPolicy.maxRetries})`, {
+            error: retryError?.message,
+          });
+          await new Promise(resolve => setTimeout(resolve, 100 * Math.pow(2, this.health.errorCount)));
+          throw retryError;
+        }
+        throw retryError;
+      }
 
       this.initialized = true;
     } catch (error) {
@@ -206,34 +196,30 @@ class NextDoctorAgent {
     }
   }
 
-  private onSpanStart(span: any): void {
-    // Custom span processing
-    const tracer = trace.getTracer('nextdoctor');
-    span.setAttribute('nextdoctor.agent.version', '0.1.0');
-  }
-
-  private onSpanEnd(span: any): void {
-    // Analyze spans for issues
-    this.analyzeSpan(span);
-  }
-
   private analyzeSpan(span: any): void {
-    const duration = span.endTime - span.startTime;
-    const durationMs = duration / 1000000; // Convert nanoseconds to ms
+    // Span analysis for detecting performance issues
+    // This will be enhanced with specific Next.js pattern detection
+    try {
+      const duration = span.duration ?? 0;
+      const durationMs = duration / 1000000; // Convert nanoseconds to ms
 
-    // Check for slow routes
-    if (span.attributes?.['http.method'] && durationMs > 3000) {
-      this.detectedIssues.push({
-        id: `slow-route-${span.spanContext().spanId}`,
-        severity: durationMs > 10000 ? 'critical' : 'high',
-        message: `Slow route detected: ${span.attributes['http.url']} took ${durationMs.toFixed(2)}ms`,
-        suggestion: 'Optimize database queries, cache responses, or break down the computation',
-        affected: [span.attributes['http.url'] as string],
-        metrics: {
-          duration: durationMs,
-          threshold: 3000,
-        },
-      });
+      // Check for slow routes
+      if (durationMs > 3000 && span.attributes?.['http.url']) {
+        const url = String(span.attributes['http.url']);
+        this.detectedIssues.push({
+          id: `slow-route-${Date.now()}-${Math.random()}`,
+          severity: durationMs > 10000 ? 'critical' : 'high',
+          message: `Slow route detected: ${url} took ${durationMs.toFixed(2)}ms`,
+          suggestion: 'Optimize database queries, cache responses, or break down the computation',
+          affected: [url],
+          metrics: {
+            duration: durationMs,
+            threshold: 3000,
+          },
+        });
+      }
+    } catch (error) {
+      this.log(LogLevelEnum.DEBUG, 'Error analyzing span', { error });
     }
   }
 

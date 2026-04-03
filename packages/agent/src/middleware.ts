@@ -1,4 +1,4 @@
-import { getNextDoctorAgent, reportMetric } from './init';
+import { getNextDoctorAgent, reportMetric } from './init.js';
 
 /**
  * Middleware para Next.js API routes

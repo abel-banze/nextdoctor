@@ -1,4 +1,4 @@
-import type { NextDoctorConfig } from './types';
+import type { NextDoctorConfig } from './types.js';
 
 /**
  * Intelligent sampler para controlar volume de traces

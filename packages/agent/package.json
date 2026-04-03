@@ -32,15 +32,13 @@
     "@opentelemetry/exporter-otlp-http": "^0.26.0",
     "@opentelemetry/instrumentation": "^0.52.1",
     "@opentelemetry/instrumentation-http": "^0.52.1",
-    "@opentelemetry/resources": "^1.24.1",
     "@opentelemetry/sdk-node": "^0.214.0",
     "@opentelemetry/sdk-trace-node": "^0.52.1",
-    "@opentelemetry/semantic-conventions": "^1.24.1",
-    "@vercel/otel": "^2.1.1",
-    "p-retry": "^6.2.0"
+    "@vercel/otel": "^2.1.1"
   },
   "devDependencies": {
     "@types/node": "^20.11.0",
+    "@workspace/eslint-config": "workspace:*",
     "@workspace/typescript-config": "workspace:*",
     "eslint": "^9.0.0",
     "typescript": "^5.9.3",
