@@ -12,6 +12,7 @@ import type {
 } from './types.js';
 import { LogLevel as LogLevelEnum, ExporterType as ExporterTypeEnum } from './types.js';
 import { SystemMonitor, type SystemMetrics } from './system-monitor.js';
+import { detectionEngine } from './detectors/index.js';
 
 class NextDoctorAgent {
   private sdk: NodeSDK | null = null;
@@ -28,6 +29,9 @@ class NextDoctorAgent {
   private logLevel: LogLevel;
   private initialized = false;
   private detectedIssues: DetectedIssue[] = [];
+  private spansBuffer: any[] = [];
+  private lastAnalysisTime = Date.now();
+  private readonly analysisIntervalMs = 5000; // Analyze spans every 5 seconds
   private startTime = Date.now();
 
   constructor(config: NextDoctorConfig) {
@@ -200,29 +204,72 @@ class NextDoctorAgent {
   }
 
   private analyzeSpan(span: any): void {
-    // Span analysis for detecting performance issues
-    // This will be enhanced with specific Next.js pattern detection
+    // Buffer span for batch analysis by detection engine
     try {
-      const duration = span.duration ?? 0;
-      const durationMs = duration / 1000000; // Convert nanoseconds to ms
+      if (!span) return;
 
-      // Check for slow routes
-      if (durationMs > 3000 && span.attributes?.['http.url']) {
-        const url = String(span.attributes['http.url']);
-        this.detectedIssues.push({
-          id: `slow-route-${Date.now()}-${Math.random()}`,
-          severity: durationMs > 10000 ? 'critical' : 'high',
-          message: `Slow route detected: ${url} took ${durationMs.toFixed(2)}ms`,
-          suggestion: 'Optimize database queries, cache responses, or break down the computation',
-          affected: [url],
-          metrics: {
-            duration: durationMs,
-            threshold: 3000,
-          },
-        });
+      // Add span to buffer with timestamp
+      this.spansBuffer.push({
+        ...span,
+        bufferedAt: Date.now(),
+      });
+
+      // Keep buffer size manageable (max 1000 spans)
+      if (this.spansBuffer.length > 1000) {
+        this.spansBuffer = this.spansBuffer.slice(-500);
+      }
+
+      // Run detection engine periodically
+      const now = Date.now();
+      if (now - this.lastAnalysisTime >= this.analysisIntervalMs) {
+        this.runDetectionEngine();
+        this.lastAnalysisTime = now;
       }
     } catch (error) {
-      this.log(LogLevelEnum.DEBUG, 'Error analyzing span', { error });
+      this.log(LogLevelEnum.DEBUG, 'Error buffering span', { error });
+    }
+  }
+
+  private runDetectionEngine(): void {
+    // Run detection engine on buffered spans
+    try {
+      if (this.spansBuffer.length === 0) return;
+
+      // Extract context from spans
+      const firstSpan = this.spansBuffer[0];
+      const route = firstSpan?.attributes?.['http.route'] || 
+                   firstSpan?.attributes?.['http.url'] || 
+                   'unknown';
+      const runtime = process.env.NEXT_RUNTIME || 'nodejs';
+
+      // Calculate startup time if this is the first request
+      const startupTimeMs = Date.now() - this.startTime;
+
+      // Analyze spans with detection engine
+      const detectedIssues = detectionEngine.analyzeSpans(this.spansBuffer, {
+        route: String(route),
+        runtime: String(runtime),
+        startupTimeMs: startupTimeMs < 30000 ? startupTimeMs : undefined, // Only report first 30s
+      });
+
+      // Merge with existing detections (detection engine handles deduplication internally)
+      if (detectedIssues.length > 0) {
+        this.detectedIssues.push(...detectedIssues);
+
+        // Keep detected issues list manageable (max 500 most recent)
+        if (this.detectedIssues.length > 500) {
+          this.detectedIssues = this.detectedIssues.slice(-250);
+        }
+
+        this.log(LogLevelEnum.DEBUG, `Detection engine found ${detectedIssues.length} issues`, {
+          issues: detectedIssues.map(i => ({ id: i.id, severity: i.severity })),
+        });
+      }
+
+      // Clear buffer after analysis to avoid re-analyzing
+      this.spansBuffer = [];
+    } catch (error) {
+      this.log(LogLevelEnum.DEBUG, 'Error running detection engine', { error });
     }
   }
 
@@ -233,6 +280,11 @@ class NextDoctorAgent {
     }
 
     try {
+      // Run detection engine one final time for any remaining buffered spans
+      if (this.spansBuffer.length > 0) {
+        this.runDetectionEngine();
+      }
+
       this.log(LogLevelEnum.INFO, 'Shutting down NextDoctor agent...');
       await this.sdk.shutdown();
       this.initialized = false;

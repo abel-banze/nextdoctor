@@ -367,6 +367,159 @@ processor.add(spanData);
 await processor.flush();
 ```
 
+## Detection Engine
+
+The NextDoctor Detection Engine automatically analyzes OpenTelemetry traces and identifies Next.js-specific performance anti-patterns. Unlike generic monitoring, it provides **actionable diagnostics** with concrete code suggestions.
+
+### Automatic Issue Detection
+
+The engine continuously monitors traces and reports detected issues via `getDetectedIssues()`:
+
+```typescript
+import { getDetectedIssues } from '@codebaz/nextdoctor-agent';
+
+// In a dashboard or monitoring endpoint
+app.get('/api/nextdoctor/issues', (req, res) => {
+  const issues = getDetectedIssues();
+  res.json({
+    total: issues.length,
+    byRoute: groupBy(issues, i => i.route),
+    critical: issues.filter(i => i.severity === 'critical'),
+  });
+});
+```
+
+### Three MVP Detection Rules
+
+#### 1. **Cold Start Threshold** (Edge Functions)
+
+Detects when your Next.js Edge Function startup time exceeds 800ms, or when there's high latency variance (P50 vs P99 > 2000ms) indicating intermittent cold starts.
+
+**Example Detection:**
+```json
+{
+  "id": "COLD_START_THRESHOLD",
+  "severity": "critical",
+  "message": "Edge function cold start: 1200ms (threshold: 800ms)",
+  "route": "/api/auth",
+  "suggestion": "Move heavy imports outside handler, consider Node.js runtime for this route, or implement keep-warm strategy"
+}
+```
+
+**When it triggers:**
+- Startup time > 800ms on Edge runtime
+- P99 latency is 2000ms+ higher than P50 (intermittent cold starts)
+
+#### 2. **Uncached Fetch Detection** (Server Components)
+
+Detects `fetch()` calls in Server Components without cache directives, especially N+1 patterns where the same URL is fetched multiple times.
+
+**Example Detection - Single Fetch:**
+```json
+{
+  "id": "FETCH_NO_CACHE",
+  "severity": "high",
+  "message": "Uncached fetch(): https://api.example.com/user",
+  "route": "/dashboard",
+  "suggestion": "Add cache directive. Example:\n\nconst data = await fetch(\n  'https://api.example.com/user',\n  { cache: 'force-cache' }\n);\n\nOr use revalidate:\n\nconst data = await fetch(..., {\n  next: { revalidate: 3600 }\n});"
+}
+```
+
+**Example Detection - N+1 Pattern:**
+```json
+{
+  "id": "FETCH_NO_CACHE",
+  "severity": "critical",
+  "message": "N+1 fetch pattern: https://api.example.com/posts called 5 times without cache",
+  "route": "/user/[id]",
+  "suggestion": "This URL is being fetched 5 times in a single request (N+1 pattern). Refactor to:\n\n1. Batch fetch all posts in one request\n2. Use Next.js Data Cache (cache directive)\n3. Use Database Queries instead of HTTP fetches"
+}
+```
+
+**When it triggers:**
+- `fetch()` called without `cache: 'no-store'` or `cache: 'no-cache'` in Server Component
+- No `next.revalidate` specified
+- Filtered: Ignores POST/PUT/DELETE, internal URLs, and calls < 50ms
+
+#### 3. **Dynamic Route Candidate** (Unnecessary Dynamic Rendering)
+
+Detects when `cookies()` or `headers()` are called but never actually read specific values, forcing the entire page to be dynamic when it could be static.
+
+**Example Detection:**
+```json
+{
+  "id": "DYNAMIC_ROUTE_CANDIDATE",
+  "severity": "warning",
+  "message": "Unnecessary dynamic rendering: cookies() called but no specific key accessed",
+  "route": "/products/[id]",
+  "suggestion": "Option 1: Remove the cookies() call if not needed\n\nOption 2: Move to Server Action:\n\n'use server';\nexport async function getUser() {\n  const sessionId = cookies().get('session')?.value;\n  // ...\n}\n\nOption 3: Add export const dynamic = 'force-static' if this route is truly static"
+}
+```
+
+**When it triggers:**
+- `cookies()` or `headers()` function is invoked
+- No child span shows specific key access (e.g., `cookies().get('key')`)
+- Route contains `[` indicating dynamic segment
+
+### Accessing Detected Issues
+
+#### Real-time in Application
+
+```typescript
+// app/api/health/route.ts
+import { getDetectedIssues, getHealthStatus } from '@codebaz/nextdoctor-agent';
+
+export async function GET() {
+  const issues = getDetectedIssues();
+  const health = getHealthStatus();
+  
+  return Response.json({
+    agent: health,
+    detected: {
+      critical: issues.filter(i => i.severity === 'critical'),
+      high: issues.filter(i => i.severity === 'high'),
+      count: issues.length,
+    },
+  });
+}
+```
+
+#### In Dashboard
+
+```typescript
+// pages/dashboard/diagnostics.tsx
+import { useSuspenseQuery } from '@tanstack/react-query';
+
+export default function DiagnosticsPage() {
+  const { data } = useSuspenseQuery({
+    queryKey: ['nextdoctor/issues'],
+    queryFn: () => fetch('/api/nextdoctor/issues').then(r => r.json()),
+    refetchInterval: 5000,
+  });
+
+  return (
+    <div>
+      <h2>NextDoctor Issues</h2>
+      {data.critical.map(issue => (
+        <div key={issue.id} className="critical">
+          <strong>{issue.message}</strong>
+          <pre>{issue.suggestion}</pre>
+        </div>
+      ))}
+    </div>
+  );
+}
+```
+
+### Deduplication & Smart Reporting
+
+The engine automatically:
+- **Deduplicates** identical issues within 60-second windows
+- **Groups** similar issues (e.g., multiple fetches to same URL)
+- **Escalates severity** for N+1 patterns (1x = high, 3x+ = critical)
+- **Tracks counts** so you know how many times an issue occurred
+- **Sorts results** by severity (critical → high → warning → info)
+
 ## Telemetry Types
 
 ### Supported Metrics

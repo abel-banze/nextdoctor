@@ -45,3 +45,16 @@ export type {
   MemoryMetrics,
   SystemMetrics,
 } from './system-monitor';
+
+export {
+  detectionEngine,
+  ColdStartThresholdDetector,
+  FetchNoCacheDetector,
+  DynamicRouteCandidateDetector,
+} from './detectors/index';
+
+export type {
+  DetectorContext,
+  DetectorResult,
+  IssueSeverity,
+} from './detectors/types';

@@ -51,7 +51,7 @@ export class CPUMonitor {
     this.lastCPUTimes = cpus_info.map((cpu) => {
       return (
         cpu.times.user +
-        cpu.times.system +
+        cpu.times.sys +
         cpu.times.idle +
         cpu.times.irq
       );
@@ -72,7 +72,7 @@ export class CPUMonitor {
     cpus_info.forEach((cpu, index) => {
       const currentTime = 
         cpu.times.user +
-        cpu.times.system +
+        cpu.times.sys +
         cpu.times.idle +
         cpu.times.irq;
       
@@ -81,7 +81,7 @@ export class CPUMonitor {
       
       if (timeDiff > 0) {
         const userTime = cpu.times.user - (this.lastCPUTimes[index] || 0);
-        const systemTime = cpu.times.system - (this.lastCPUTimes[index] || 0);
+        const systemTime = cpu.times.sys - (this.lastCPUTimes[index] || 0);
         const usage = ((userTime + systemTime) / timeDiff) * 100;
         totalUsage += Math.min(100, Math.max(0, usage));
       }
@@ -90,15 +90,15 @@ export class CPUMonitor {
     });
 
     const averageUsage = totalUsage / coreCount;
-    const systemLoadPerCore = one / coreCount;
+    const systemLoadPerCore = one! / coreCount;
 
     return {
       timestamp: Date.now(),
       usage: Math.round(averageUsage * 100) / 100,
       loadAverage: {
-        oneMinute: Math.round(one * 100) / 100,
-        fiveMinutes: Math.round(five * 100) / 100,
-        fifteenMinutes: Math.round(fifteen * 100) / 100,
+        oneMinute: Math.round(one! * 100) / 100,
+        fiveMinutes: Math.round(five! * 100) / 100,
+        fifteenMinutes: Math.round(fifteen! * 100) / 100,
       },
       coreCount,
       systemLoadPerCore: Math.round(systemLoadPerCore * 100) / 100,
