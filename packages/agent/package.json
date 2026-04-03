@@ -9,6 +9,14 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./middleware": {
+      "types": "./dist/middleware.d.ts",
+      "import": "./dist/middleware.js"
+    },
+    "./optimization": {
+      "types": "./dist/optimization.d.ts",
+      "import": "./dist/optimization.js"
     }
   },
   "scripts": {
@@ -18,10 +26,18 @@
     "lint": "eslint . --ext .ts"
   },
   "dependencies": {
-    "@opentelemetry/api": "^1.8.0",
-    "@opentelemetry/sdk-node": "^0.52.1",
-    "@opentelemetry/auto-instrumentations-node": "^0.52.1",
-    "@opentelemetry/exporter-otlp-http": "^0.52.1"
+    "@opentelemetry/api": "^1.9.1",
+    "@opentelemetry/auto-instrumentations-node": "^0.72.0",
+    "@opentelemetry/core": "^1.24.1",
+    "@opentelemetry/exporter-otlp-http": "^0.26.0",
+    "@opentelemetry/instrumentation": "^0.52.1",
+    "@opentelemetry/instrumentation-http": "^0.52.1",
+    "@opentelemetry/resources": "^1.24.1",
+    "@opentelemetry/sdk-node": "^0.214.0",
+    "@opentelemetry/sdk-trace-node": "^0.52.1",
+    "@opentelemetry/semantic-conventions": "^1.24.1",
+    "@vercel/otel": "^2.1.1",
+    "p-retry": "^6.2.0"
   },
   "devDependencies": {
     "@types/node": "^20.11.0",
