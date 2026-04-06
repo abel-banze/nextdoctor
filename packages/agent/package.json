@@ -1,6 +1,6 @@
 {
   "name": "@codebaz/nextdoctor-agent",
-  "version": "0.1.2-beta",
+  "version": "0.1.2-beta.1",
   "type": "module",
   "bin": {
     "nextdoctor-agent": "./dist/cli/index.js"
