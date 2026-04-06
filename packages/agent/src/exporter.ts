@@ -1,6 +1,7 @@
 import type { ExportResult } from '@opentelemetry/core';
 import type { SpanExporter, ReadableSpan } from '@opentelemetry/sdk-trace-base';
 import type { DetectedIssue, DetectorContext } from './detectors/types.js';
+import { CircuitBreaker } from './optimization.js';
 
 export interface NextDoctorExporterOptions {
   endpoint: string;               // e.g. 'https://ingest.nextdoctor.dev'
@@ -32,6 +33,7 @@ export class NextDoctorExporter implements SpanExporter {
   private readonly getContext: () => DetectorContext;
   private readonly timeoutMs: number;
   private isShutdown = false;
+  private circuitBreaker = new CircuitBreaker();
 
   constructor(opts: NextDoctorExporterOptions) {
     this.endpoint = opts.endpoint.replace(/\/$/, '');
@@ -75,19 +77,21 @@ export class NextDoctorExporter implements SpanExporter {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), this.timeoutMs);
 
-      const response = await fetch(`${this.endpoint}/ingest`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.projectToken}`,
-        },
-        body: JSON.stringify(payload),
-        signal: controller.signal,
+      const response = await this.circuitBreaker.execute(async () => {
+        return fetch(`${this.endpoint}/ingest`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${this.projectToken}`,
+          },
+          body: JSON.stringify(payload),
+          signal: controller.signal,
+        });
       });
 
       clearTimeout(timer);
 
-      if (!response.ok) {
+      if (!response || !response.ok) {
         resultCallback({ code: 1 }); // FAILED
         return;
       }

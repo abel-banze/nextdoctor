@@ -88,30 +88,13 @@ export class FetchNoCacheDetector extends BaseDetector {
         // N+1 detected
         issues.push({
           id: this.id,
+          type: 'FETCH_N_PLUS_ONE',
           severity: 'critical',
           message: `Fetch "${url}" called ${fetches.length}x with no cache → likely fetch N+1 pattern`,
-          suggestion: `This endpoint is being called multiple times without caching. Add a cache directive:
-
-// Option 1: Force cache (recommended for static data)
-fetch("${url}", { cache: 'force-cache' })
-
-// Option 2: Revalidate after time (recommended for semi-dynamic data)
-fetch("${url}", { 
-  next: { revalidate: 3600 } // revalidate every hour
-})
-
-// Option 3: Use server-side data fetching instead
-// Move to a parent Server Component or Route Handler
-
-// Option 4: Use unstable_cache wrapper (experimental)
-import { unstable_cache } from 'next/cache';
-const cachedFetch = unstable_cache(
-  async () => fetch("${url}").then(r => r.json()),
-  [${JSON.stringify(url)}],
-  { revalidate: 3600 }
-);`,
+          suggestion: `Adicione uma diretiva de cache no fetch ou use 'use cache'.`,
           route: context.route,
           spanId: fetches[0]?.spanId,
+          detectedAt: Date.now(),
           attributes: {
             url,
             callCount: fetches.length,
@@ -120,63 +103,42 @@ const cachedFetch = unstable_cache(
               fetches.reduce((sum, f) => sum + f.duration, 0) / fetches.length
             ),
           },
-          detectedAt: Date.now(),
         });
       } else if (fetches.length === 1) {
         // Single slow fetch without cache
         const fetch = fetches[0]!;
         issues.push({
           id: this.id,
+          type: 'FETCH_NO_CACHE',
           severity: 'high',
           message: `Fetch "${url}" has no cache → +${Math.round(fetch.duration)}ms per request`,
-          suggestion: `Add a cache directive to this fetch:
-
-// Option 1: Force cache (best for static APIs)
-fetch("${url}", { cache: 'force-cache' })
-
-// Option 2: Revalidate after time (better for semi-dynamic data)
-fetch("${url}", { 
-  next: { revalidate: 3600 } // revalidate every hour
-})
-
-// Option 3: Combine with other optimizations
-const data = await fetch("${url}", {
-  cache: 'force-cache',
-  headers: {
-    'User-Agent': 'NextDoctor-Agent/1.0'
-  }
-});`,
+          suggestion: `Adicione uma diretiva de cache (ex: cache: 'force-cache') ou 'use cache'.`,
           route: context.route,
           spanId: fetch.spanId,
+          detectedAt: Date.now(),
           attributes: {
             url,
             duration: Math.round(fetch.duration),
           },
-          detectedAt: Date.now(),
         });
       } else {
         // 2 to nPlus1Threshold-1 calls: still suspicious
         const totalDuration = Math.round(fetches.reduce((sum, f) => sum + f.duration, 0));
         issues.push({
           id: this.id,
+          type: 'FETCH_MULTIPLE_NO_CACHE',
           severity: 'high',
-          message: `Fetch "${url}" called ${fetches.length}x with no cache → ${totalDuration}ms wasted per request`,
-          suggestion: `This endpoint is being called multiple times without caching. Consider adding a cache directive or deduplicating the request:
-
-// Option 1: Force cache
-fetch("${url}", { cache: 'force-cache' })
-
-// Option 2: Revalidate after time
-fetch("${url}", { next: { revalidate: 3600 } })`,
+          message: `Fetch "${url}" chamado ${fetches.length}x sem cache → ${totalDuration}ms perdidos`,
+          suggestion: `Este endpoint está a ser chamado múltiplas vezes sem cache. Considere deduplicar.`,
           route: context.route,
           spanId: fetches[0]?.spanId,
+          detectedAt: Date.now(),
           attributes: {
             url,
             callCount: fetches.length,
             totalDuration,
             avgDuration: Math.round(totalDuration / fetches.length),
           },
-          detectedAt: Date.now(),
         });
       }
     });

@@ -166,8 +166,7 @@ describe('ColdStartThresholdDetector', () => {
       startupTimeMs: 1200,
     });
 
-    expect(issues[0]!.suggestion).toContain('import');
-    expect(issues[0]!.suggestion).toContain('runtime');
+    expect(issues[0]!.suggestion).toContain('Mova');
   });
 
   it('includes attributes with threshold data', () => {

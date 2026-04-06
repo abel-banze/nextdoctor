@@ -43,10 +43,19 @@ export interface NextDoctorConfig {
   samplingRate?: number; // 0.0 to 1.0
   enableDebugLogging?: boolean;
   timeout?: number; // ms
+  modules?: AgentModules;
+}
+
+export interface AgentModules {
+  db?: boolean;
+  profiling?: boolean;
+  rsc?: boolean;
+  client?: boolean;
 }
 
 export interface DetectedIssue {
   id: string;
+  type: string;
   severity: 'info' | 'warning' | 'high' | 'critical';
   message: string;
   suggestion: string;

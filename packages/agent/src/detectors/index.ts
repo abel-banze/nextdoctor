@@ -3,6 +3,12 @@ import { BaseDetector } from './base-detector.js';
 import { ColdStartThresholdDetector } from './cold-start-threshold.detector.js';
 import { FetchNoCacheDetector } from './fetch-no-cache.detector.js';
 import { DynamicRouteCandidateDetector } from './dynamic-route-candidate.detector.js';
+import { RscIntrospectionDetector } from './rsc-introspection.detector.js';
+import { DbPerformanceDetector } from './db-performance.detector.js';
+import { WaterfallDetector } from './waterfall.detector.js';
+import { DataFetchingDetector } from './data-fetching.detector.js';
+import { InfraDetector } from './infra.detector.js';
+import { ClientVitalsDetector } from './client-vitals.detector.js';
 import type { DetectedIssue, DetectorContext, IssueDeduplicationKey, DedupedIssue } from './types.js';
 
 export class DetectionEngine {
@@ -18,6 +24,12 @@ export class DetectionEngine {
       new ColdStartThresholdDetector(),
       new FetchNoCacheDetector(),
       new DynamicRouteCandidateDetector(),
+      new RscIntrospectionDetector(),
+      new DbPerformanceDetector(),
+      new WaterfallDetector(),
+      new DataFetchingDetector(),
+      new InfraDetector(),
+      new ClientVitalsDetector(),
     ];
 
     this.detectors = allDetectors.filter(d => !disabledSet.has(d.id));
@@ -125,3 +137,9 @@ export { BaseDetector } from './base-detector.js';
 export { ColdStartThresholdDetector } from './cold-start-threshold.detector.js';
 export { FetchNoCacheDetector } from './fetch-no-cache.detector.js';
 export { DynamicRouteCandidateDetector } from './dynamic-route-candidate.detector.js';
+export { RscIntrospectionDetector } from './rsc-introspection.detector.js';
+export { WaterfallDetector } from './waterfall.detector.js';
+export { DataFetchingDetector } from './data-fetching.detector.js';
+export { InfraDetector } from './infra.detector.js';
+export { ClientVitalsDetector } from './client-vitals.detector.js';
+export { DbPerformanceDetector } from './db-performance.detector.js';

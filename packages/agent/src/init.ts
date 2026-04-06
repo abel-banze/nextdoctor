@@ -1,23 +1,48 @@
-import { NodeSDK } from '@opentelemetry/sdk-node';
-import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentations-node';
-import { trace } from '@opentelemetry/api';
+import { registerOTel } from '@vercel/otel';
+import { trace, Span } from '@opentelemetry/api';
+import { SpanProcessor, ReadableSpan, Sampler, SamplingDecision, SamplingResult, BatchSpanProcessor } from '@opentelemetry/sdk-trace-base';
 import { NextDoctorExporter } from './exporter.js';
 import type {
   NextDoctorConfig,
-  ExporterType,
   RetryPolicy,
   AgentHealth,
   DetectedIssue,
   LogLevel,
 } from './types.js';
-import { LogLevel as LogLevelEnum, ExporterType as ExporterTypeEnum } from './types.js';
+import { LogLevel as LogLevelEnum } from './types.js';
 import { SystemMonitor, type SystemMetrics } from './system-monitor.js';
 import { detectionEngine } from './detectors/index.js';
+import { IntelligentSampler } from './optimization.js';
+import { V8MemoryRescue } from './profiler/v8-rescue.js';
+
+class IntelligentSamplerAdapter implements Sampler {
+  private sampler: IntelligentSampler;
+  
+  constructor(samplingRate: number) {
+    this.sampler = new IntelligentSampler(samplingRate);
+  }
+
+  shouldSample(_context: unknown, _traceId: string, spanName: string): SamplingResult {
+    const shouldSample = this.sampler.shouldSample(spanName);
+    this.sampler.recordSpan();
+    return {
+      decision: shouldSample ? SamplingDecision.RECORD_AND_SAMPLED : SamplingDecision.NOT_RECORD,
+    };
+  }
+  
+  toString(): string {
+    return `IntelligentSamplerAdapter{rate=${this.sampler.getSamplingRate()}}`;
+  }
+
+  setRate(newRate: number): void {
+    this.sampler.setRate(newRate);
+  }
+}
 
 class NextDoctorAgent {
-  private sdk: NodeSDK | null = null;
   private config: NextDoctorConfig;
   private systemMonitor: SystemMonitor;
+  private memoryRescue: V8MemoryRescue;
   private health: AgentHealth = {
     initialized: false,
     isHealthy: true,
@@ -29,9 +54,9 @@ class NextDoctorAgent {
   private logLevel: LogLevel;
   private initialized = false;
   private detectedIssues: DetectedIssue[] = [];
-  private spansBuffer: any[] = [];
+  private spansBuffer: (ReadableSpan & { bufferedAt: number })[] = [];
   private lastAnalysisTime = Date.now();
-  private readonly analysisIntervalMs = 5000; // Analyze spans every 5 seconds
+  private readonly analysisIntervalMs = 5000;
   private startTime = Date.now();
 
   constructor(config: NextDoctorConfig) {
@@ -58,6 +83,7 @@ class NextDoctorAgent {
       this.retryPolicy = { ...this.retryPolicy, ...config.retryPolicy };
     }
     this.systemMonitor = new SystemMonitor((level, message, meta) => this.log(level, message, meta));
+    this.memoryRescue = new V8MemoryRescue((level, message, meta) => this.log(level, message, meta));
   }
 
   private validateConfig(config: Partial<NextDoctorConfig>): void {
@@ -72,7 +98,7 @@ class NextDoctorAgent {
     }
   }
 
-  private log(level: LogLevel, message: string, meta?: any): void {
+  private log(level: LogLevel, message: string, meta?: Record<string, unknown>): void {
     if (level < this.logLevel) return;
 
     const timestamp = new Date().toISOString();
@@ -91,7 +117,6 @@ class NextDoctorAgent {
       projectToken: this.config.projectToken,
       getIssues: () => this.detectedIssues,
       clearIssues: (sent) => {
-        // Remove only the issues that were successfully flushed
         const sentSet = new Set(sent.map(i => `${i.id}:${i.detectedAt}`));
         this.detectedIssues = this.detectedIssues.filter(
           i => !sentSet.has(`${i.id}:${i.detectedAt}`)
@@ -115,27 +140,77 @@ class NextDoctorAgent {
     });
   }
 
-  private createResource(): any {
-    // Using any to avoid version mismatch issues with OpenTelemetry
-    const attributes: Record<string, string | number> = {
-      'service.name': this.config.serviceName || 'nextdoctor-app',
-      'service.version': this.config.version || '0.1.0',
-      'deployment.environment': this.config.environment || 'production',
-      'service.instance.id': this.generateInstanceId(),
+  private createResource(): { attributes: Record<string, string | number> } {
+    return {
+      attributes: {
+        'service.name': this.config.serviceName || 'nextdoctor-app',
+        'service.version': this.config.version || '0.1.0',
+        'deployment.environment': this.config.environment || 'production',
+        'service.instance.id': this.generateInstanceId(),
+      }
     };
-
-    return { attributes };
   }
 
   private generateInstanceId(): string {
-    return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    return `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
   }
 
-  private isVercelEnvironment(): boolean {
-    return !!(
-      typeof process !== 'undefined' &&
-      process.env.VERCEL === '1'
-    );
+  public analyzeSpanFromProcessor(span: ReadableSpan): void {
+    try {
+      this.spansBuffer.push(Object.assign({}, span, { bufferedAt: Date.now() }) as ReadableSpan & { bufferedAt: number });
+
+      this.health.bufferedSpans = this.spansBuffer.length;
+
+      const now = Date.now();
+      if (now - this.lastAnalysisTime >= this.analysisIntervalMs || this.spansBuffer.length >= 500) {
+        this.runDetectionEngine();
+        this.lastAnalysisTime = now;
+      }
+    } catch (error) {
+      this.log(LogLevelEnum.DEBUG, 'Error buffering span', { error: String(error) });
+    }
+  }
+
+  private runDetectionEngine(): void {
+    try {
+      if (this.spansBuffer.length === 0) return;
+
+      const spansToAnalyze = [...this.spansBuffer];
+      this.spansBuffer = [];
+      this.health.bufferedSpans = 0;
+
+      const firstSpan = spansToAnalyze[0];
+      const route = firstSpan?.attributes?.['http.route'] || 
+                   firstSpan?.attributes?.['http.url'] || 
+                   'unknown';
+      const runtime = (process.env.NEXT_RUNTIME || 'nodejs') as 'nodejs' | 'edge';
+
+      const startupTimeMs = Date.now() - this.startTime;
+      const metrics = this.systemMonitor.getSystemMetrics();
+
+      const detectedIssues = detectionEngine.analyzeSpans(spansToAnalyze, {
+        route: String(route),
+        runtime,
+        startupTimeMs: startupTimeMs < 30000 ? startupTimeMs : undefined,
+        systemMetrics: {
+          cpuUsage: metrics.cpu.usage,
+          memoryUsagePercent: metrics.memory.systemMemoryUsagePercent,
+          heapUsed: metrics.memory.heapUsed,
+          heapTotal: metrics.memory.heapTotal,
+        },
+      });
+
+      if (detectedIssues.length > 0) {
+        this.detectedIssues.push(...detectedIssues);
+        if (this.detectedIssues.length > 500) {
+          this.detectedIssues = this.detectedIssues.slice(-250);
+        }
+
+        this.log(LogLevelEnum.DEBUG, `Detection engine found ${detectedIssues.length} issues`);
+      }
+    } catch (error) {
+      this.log(LogLevelEnum.DEBUG, 'Error running detection engine', { error: String(error) });
+    }
   }
 
   async initialize(): Promise<void> {
@@ -155,39 +230,83 @@ class NextDoctorAgent {
 
         const traceExporter = this.createTraceExporter();
         const resource = this.createResource();
-
-        this.sdk = new NodeSDK({
-          resource: resource as any,
-          traceExporter,
-          instrumentations: [
-            getNodeAutoInstrumentations({
-              '@opentelemetry/instrumentation-http': {
-                enabled: true,
-                responseHook: (span: any, response: any) => {
-                  if (response.statusCode) {
-                    span.setAttribute('http.response.status', response.statusCode);
-                  }
-                },
-              },
-              '@opentelemetry/instrumentation-fs': {
-                enabled: true,
-              },
-              '@opentelemetry/instrumentation-express': {
-                enabled: true,
-              },
-            }),
-          ],
+        
+        const batchSpanProcessor = new BatchSpanProcessor(traceExporter, {
+          maxExportBatchSize: this.config.exporter?.batchSize ?? 100,
+          scheduledDelayMillis: this.config.exporter?.batchTimeoutMs ?? 5000,
         });
 
-        await this.sdk.start();
+        const detectionSpanProcessor: SpanProcessor = {
+          forceFlush: async () => {},
+          onStart: () => {},
+          onEnd: (span) => {
+             this.analyzeSpanFromProcessor(span);
+          },
+          shutdown: async () => {},
+        };
+
+        const agentSampler = new IntelligentSamplerAdapter(this.config.samplingRate ?? 1.0);
+
+        // --- Modular Instrumentation Loading ---
+        const instrumentations: any[] = [];
+        const modules = this.config.modules || { db: true, profiling: true, rsc: true, client: true };
+
+        if (modules.db && process.env.NEXT_RUNTIME === 'nodejs') {
+          try {
+            const { PrismaInstrumentation } = await import('@prisma/instrumentation');
+            const { PgInstrumentation } = await import('@opentelemetry/instrumentation-pg');
+            const { MySQL2Instrumentation } = await import('@opentelemetry/instrumentation-mysql2');
+            const { PostgresInstrumentation } = await import('otel-instrumentation-postgres');
+            
+            instrumentations.push(
+              new PrismaInstrumentation(),
+              new PgInstrumentation(),
+              new MySQL2Instrumentation(),
+              new PostgresInstrumentation()
+            );
+          } catch (e) {
+            this.log(LogLevelEnum.DEBUG, 'DB Instrumentations not available, skipping...');
+          }
+        }
+
+        registerOTel({
+          serviceName: this.config.serviceName || 'nextdoctor-app',
+          attributes: resource.attributes,
+          spanProcessors: [batchSpanProcessor, detectionSpanProcessor],
+          sampler: agentSampler,
+          instrumentations,
+          instrumentationConfig: {
+            fetch: { ignoreUrls: [/ingest\.nextdoctor\.dev/] }
+          }
+        });
+
         this.health.initialized = true;
+        if (modules.profiling && process.env.NEXT_RUNTIME === 'nodejs') {
+          this.memoryRescue.start();
+        }
         this.health.isHealthy = true;
         this.log(LogLevelEnum.INFO, 'NextDoctor agent initialized successfully');
-      } catch (retryError: any) {
+
+        // --- Adaptive Sampling Loop ---
+        if (process.env.NEXT_RUNTIME === 'nodejs') {
+          setInterval(() => {
+            const metrics = this.systemMonitor.getSystemMetrics();
+            if (metrics.cpu.usage > 90) {
+              this.log(LogLevelEnum.WARN, `High CPU detected (${metrics.cpu.usage.toFixed(1)}%). Reducing sampling to 0% to preserve system.`);
+              agentSampler.setRate(0);
+            } else if (metrics.cpu.usage > 70) {
+              const currentRate = this.config.samplingRate ?? 1.0;
+              agentSampler.setRate(currentRate * 0.2); // Throttle to 20% of target
+            } else {
+              agentSampler.setRate(this.config.samplingRate ?? 1.0);
+            }
+          }, 10000); // Check every 10s
+        }
+      } catch (retryError) {
         this.health.errorCount++;
         if (this.health.errorCount < this.retryPolicy.maxRetries) {
           this.log(LogLevelEnum.WARN, `Initialization attempt failed, retrying... (${this.health.errorCount}/${this.retryPolicy.maxRetries})`, {
-            error: retryError?.message,
+            error: retryError instanceof Error ? retryError.message : String(retryError),
           });
           await new Promise(resolve => setTimeout(resolve, 100 * Math.pow(2, this.health.errorCount)));
           throw retryError;
@@ -208,90 +327,20 @@ class NextDoctorAgent {
     }
   }
 
-  private analyzeSpan(span: any): void {
-    // Buffer span for batch analysis by detection engine
-    try {
-      if (!span) return;
-
-      // Add span to buffer with timestamp
-      this.spansBuffer.push({
-        ...span,
-        bufferedAt: Date.now(),
-      });
-
-      // Keep buffer size manageable (max 1000 spans)
-      if (this.spansBuffer.length > 1000) {
-        this.spansBuffer = this.spansBuffer.slice(-500);
-      }
-
-      // Run detection engine periodically
-      const now = Date.now();
-      if (now - this.lastAnalysisTime >= this.analysisIntervalMs) {
-        this.runDetectionEngine();
-        this.lastAnalysisTime = now;
-      }
-    } catch (error) {
-      this.log(LogLevelEnum.DEBUG, 'Error buffering span', { error });
-    }
-  }
-
-  private runDetectionEngine(): void {
-    // Run detection engine on buffered spans
-    try {
-      if (this.spansBuffer.length === 0) return;
-
-      // Extract context from spans
-      const firstSpan = this.spansBuffer[0];
-      const route = firstSpan?.attributes?.['http.route'] || 
-                   firstSpan?.attributes?.['http.url'] || 
-                   'unknown';
-      const runtime = (process.env.NEXT_RUNTIME || 'nodejs') as 'nodejs' | 'edge';
-
-      // Calculate startup time if this is the first request
-      const startupTimeMs = Date.now() - this.startTime;
-
-      // Analyze spans with detection engine
-      const detectedIssues = detectionEngine.analyzeSpans(this.spansBuffer, {
-        route: String(route),
-        runtime,
-        startupTimeMs: startupTimeMs < 30000 ? startupTimeMs : undefined, // Only report first 30s
-      });
-
-      // Merge with existing detections (detection engine handles deduplication internally)
-      if (detectedIssues.length > 0) {
-        this.detectedIssues.push(...detectedIssues);
-
-        // Keep detected issues list manageable (max 500 most recent)
-        if (this.detectedIssues.length > 500) {
-          this.detectedIssues = this.detectedIssues.slice(-250);
-        }
-
-        this.log(LogLevelEnum.DEBUG, `Detection engine found ${detectedIssues.length} issues`, {
-          issues: detectedIssues.map(i => ({ id: i.id, severity: i.severity })),
-        });
-      }
-
-      // Clear buffer after analysis to avoid re-analyzing
-      this.spansBuffer = [];
-    } catch (error) {
-      this.log(LogLevelEnum.DEBUG, 'Error running detection engine', { error });
-    }
-  }
-
   async shutdown(): Promise<void> {
-    if (!this.sdk) {
+    if (!this.initialized) {
       this.log(LogLevelEnum.WARN, 'NextDoctor agent not initialized');
       return;
     }
 
     try {
-      // Run detection engine one final time for any remaining buffered spans
       if (this.spansBuffer.length > 0) {
         this.runDetectionEngine();
       }
 
       this.log(LogLevelEnum.INFO, 'Shutting down NextDoctor agent...');
-      await this.sdk.shutdown();
+      this.memoryRescue.stop();
+      // OTel via Vercel shuts down globally on process exit
       this.initialized = false;
       this.health.initialized = false;
       this.log(LogLevelEnum.INFO, 'NextDoctor agent shut down successfully');
@@ -317,7 +366,7 @@ class NextDoctorAgent {
     this.detectedIssues = [];
   }
 
-  reportCustomMetric(name: string, value: number, attributes?: Record<string, any>): void {
+  reportCustomMetric(name: string, value: number, attributes?: Record<string, string | number | boolean>): void {
     if (!this.initialized) {
       this.log(LogLevelEnum.WARN, 'Agent not initialized, metric not reported', { name });
       return;
@@ -362,7 +411,6 @@ class NextDoctorAgent {
   }
 }
 
-// Global singleton instance
 let agentInstance: NextDoctorAgent | null = null;
 
 export async function initNextDoctor(config: NextDoctorConfig): Promise<void> {
@@ -389,7 +437,7 @@ export function getNextDoctorAgent(): NextDoctorAgent | null {
   return agentInstance;
 }
 
-export function reportMetric(name: string, value: number, attributes?: Record<string, any>): void {
+export function reportMetric(name: string, value: number, attributes?: Record<string, string | number | boolean>): void {
   if (!agentInstance) {
     console.warn('NextDoctor agent not initialized, metric not reported');
     return;

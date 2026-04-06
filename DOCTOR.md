@@ -12,7 +12,7 @@ NextDoctor is **not** a generic monitoring tool. It is a debugger that natively 
 - Detects Next.js-specific anti-patterns automatically
 - Explains problems in developer language (not just raw metrics)
 - Works first-class with self-hosted deployments (Coolify, Dokploy, Railway, Fly.io)
-- Zero-config setup via `npx nextdoctor init`
+- Zero-config setup via `npx @codebaz/nextdoctor init`
 
 ---
 
@@ -46,14 +46,14 @@ The CLI (`nextdoctor`) and the agent (`@nextdoctor/agent`) are installed in the 
 
 ## Package Responsibilities
 
-### `packages/cli`
-- Entry point: `npx nextdoctor init`
+### `packages/nextdoctor-cli`
+- Entry point: `npx @codebaz/nextdoctor init`
 - Responsibilities:
   - Scaffold `instrumentation.ts` in the user's Next.js project
-  - Install and configure `@nextdoctor/agent`
+  - Install and configure `@codebaz/nextdoctor-agent`
   - Write `nextdoctor.config.ts` with project token and options
   - Validate Next.js version compatibility
-- Published as: `nextdoctor` on npm
+- Published as: `@codebaz/nextdoctor` on npm
 - Runtime: Node.js (not Edge)
 
 ### `packages/agent`
@@ -62,7 +62,7 @@ The CLI (`nextdoctor`) and the agent (`@nextdoctor/agent`) are installed in the 
   - Capture OpenTelemetry traces scoped to Next.js primitives
   - Detect anti-patterns at runtime (see Detection Rules below)
   - Send trace data to `apps/api` (or local endpoint if self-hosted)
-- Published as: `@nextdoctor/agent` on npm
+- Published as: `@codebaz/nextdoctor-agent` on npm
 - Runtime: Node.js + Edge Runtime compatible
 - Must be **zero-dependency** or near-zero to avoid bloating the user's bundle
 
@@ -71,19 +71,19 @@ The CLI (`nextdoctor`) and the agent (`@nextdoctor/agent`) are installed in the 
 - No runtime logic — types and constants only
 - Not published to npm (internal only)
 
-### `apps/api`
+### `apps/collector`
 - Receives trace payloads from agents in production
 - Runs analysis pipeline: pattern matching → diagnosis generation
 - Stores results (diagnosis history, route metrics)
 - Exposes REST + WebSocket endpoints for the dashboard
 - Auth: project tokens (MVP), OAuth (later)
 
-### `apps/web`
+### `apps/dashboard`
 - Dashboard: displays diagnoses, route performance, fix suggestions
 - Real-time updates via WebSocket from `apps/api`
 - Auth: project token login (MVP)
 
-### `apps/marketing`
+### `apps/web`
 - Public landing page
 - Waitlist capture
 - Docs (or separate `apps/docs` later)
@@ -124,15 +124,15 @@ User's Next.js App (production)
         │
         │  OpenTelemetry traces
         ▼
-@nextdoctor/agent
+@codebaz/nextdoctor-agent
         │
         │  POST /ingest (project token auth)
         ▼
-apps/api  ──→  Pattern matching engine
+apps/collector  ──→  Pattern matching engine
         │
         │  Diagnosis + fix suggestion
         ▼
-apps/web (dashboard)
+apps/dashboard (dashboard)
         │
         ▼
 Developer sees: "This route is slow because X → here's the fix"
@@ -185,7 +185,7 @@ Developer sees: "This route is slow because X → here's the fix"
 DATABASE_URL=
 NEXTDOCTOR_SECRET=          # internal signing secret
 
-# apps/web
+# apps/dashboard
 NEXT_PUBLIC_API_URL=
 NEXT_PUBLIC_STRIPE_KEY=
 
@@ -206,8 +206,8 @@ pnpm install
 pnpm dev
 
 # Run a specific app
-pnpm --filter web dev
-pnpm --filter api dev
+pnpm --filter dashboard dev
+pnpm --filter collector dev
 
 # Build all packages
 pnpm build

@@ -46,58 +46,17 @@ export class DynamicRouteCandidateDetector extends BaseDetector {
         
         issues.push({
           id: this.id,
+          type: 'DYNAMIC_ROUTE_CANDIDATE',
           severity: 'info',
           message: `Route "${context.route}" may be unnecessarily dynamic: ${spanName} called with no subsequent reads detected`,
-          suggestion: `This route is paying the dynamic rendering cost without reading any actual values.
-
-Option 1 — Remove the ${spanName}() call:
-// ❌ Before
-export default async function Page() {
-  const cookies = cookies(); // forces dynamic but never used
-  return <div>Static content</div>;
-}
-
-// ✅ After
-export default function Page() {
-  return <div>Static content</div>;
-}
-
-Option 2 — Move to a Server Action:
-'use client';
-import { getSessionCookie } from './actions';
-
-export default function Page() {
-  const handleClick = async () => {
-    const session = await getSessionCookie();
-    // ...
-  };
-  return <button onClick={handleClick}>Click me</button>;
-}
-
-// app/actions.ts
-'use server';
-import { cookies } from 'next/headers';
-
-export async function getSessionCookie() {
-  const c = cookies();
-  return c.get('session')?.value;
-}
-
-Option 3 — If the route is fully static and shouldn't trigger dynamic rendering:
-export const dynamic = 'force-static';
-
-export default function Page() {
-  // ... static content
-}
-
-See: https://nextjs.org/docs/app/building-your-application/rendering/static-and-dynamic`,
+          suggestion: `A rota está a pagar o custo de renderização dinâmica sem ler valores. Remova a chamada se desnecessário.`,
           route: context.route,
           spanId: span.spanContext().spanId,
+          detectedAt: Date.now(),
           attributes: {
             trigger: span.name,
             childrenCount: children.length,
           },
-          detectedAt: Date.now(),
         });
       }
     });

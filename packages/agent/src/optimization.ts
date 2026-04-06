@@ -55,6 +55,10 @@ export class IntelligentSampler {
   getSamplingRate(): number {
     return this.samplingRate;
   }
+
+  setRate(newRate: number): void {
+    this.samplingRate = Math.max(0, Math.min(1, newRate));
+  }
 }
 
 /**

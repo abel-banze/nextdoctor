@@ -4,20 +4,20 @@
 
 ## Features
 
-- ✅ **Zero-Config Instrumentation**: Works out-of-the-box via Next.js Instrumentation Hook
-- ✅ **Vercel Native**: Seamless integration with Vercel deployments and `@vercel/otel`
-- ✅ **CPU & Memory Monitoring**: Real-time system resource tracking with threshold alerts
-- ✅ **Intelligent Sampling**: Adaptive sampling rate to manage trace volume
-- ✅ **Performance Monitoring**: Automatic detection of slow routes and database queries
-- ✅ **Anomaly Detection**: Real-time issue detection with actionable suggestions
-- ✅ **Circuit Breaker**: Protected exports with automatic failover
-- ✅ **Batch Processing**: Memory-efficient trace batching
-- ✅ **Enterprise Logging**: Structured logging with multiple levels (DEBUG, INFO, WARN, ERROR)
-- ✅ **Custom Metrics**: Easy API for application-level metrics
-- ✅ **Health Monitoring**: Real-time agent health status
-- ✅ **Middleware Support**: Ready-made instrumentation for API routes
-- ✅ **Retry Policy**: Configurable exponential backoff with jitter
-- ✅ **Multi-Environment**: Support for development, staging, and production
+- ✅ **Zero-Config Instrumentation**: Built-in compatibility with Next.js `instrumentation.ts`
+- ✅ **Edge Runtime Native**: Full support for Vercel Edge and Cloudflare Workers via `@vercel/otel`
+- ✅ **Deep DB Tracking**: Automatic N+1 and slow query detection for Prisma, PostgreSQL, and MySQL
+- ✅ **RSC Introspection**: Monitor React Server Component payload size and metadata latencies
+- ✅ **Auto-fix CLI**: `npx nextdoctor-agent fix` to automatically refactor performance anti-patterns
+- ✅ **V8 Memory Rescue**: Automatic V8 heap snapshots in Node.js when memory usage exceeds thresholds
+- ✅ **Intelligent Sampling**: Adaptive sampling rate based on system CPU and trace volume
+- ✅ **React-Scan Integration**: Client-side render auditing with automated backend reporting
+- ✅ **Waterfall Detection**: Identify sequential `await` calls in React Server Components
+- ✅ **Infrastructure Guard**: Detect Node.js APIs in Edge Runtime and potential memory leaks
+- ✅ **Security Auditing**: Scan for exposed secrets in `NEXT_PUBLIC_` and missing CSP headers
+- ✅ **UX Vitals**: Real-time monitoring of LCP, CLS, and interaction responsiveness
+- ✅ **Enterprise Middleware**: High-performance wrappers for API routes and custom operation timing
+- ✅ **Health Monitoring**: Real-time agent status, circuit breakers, and batch processing
 
 ## Installation
 
@@ -78,19 +78,25 @@ await initNextDoctor({
   projectToken: process.env.NEXTDOCTOR_PROJECT_TOKEN!,
   endpoint: process.env.NEXTDOCTOR_ENDPOINT || 'https://ingest.nextdoctor.dev',
 
-  // Optional - Enterprise Features
-  enabled: true,
+  // Optional - Environment & Context
+  enabled: process.env.NODE_ENV === 'production',
   serviceName: 'my-next-app',
   version: '1.2.3',
   environment: 'production',
   logLevel: LogLevel.INFO,
   samplingRate: 1.0, // 0.0 to 1.0
   timeout: 30000, // ms
-  enableDebugLogging: false,
+
+  // Feature Modules (All enabled by default)
+  modules: {
+    db: true,        // Database tracing & N+1 detection
+    profiling: true, // V8 Memory Rescue (Node.js only)
+    rsc: true,       // React Server Component introspection
+    client: true     // Browser vitals & React-Scan
+  },
 
   // Exporter Configuration
   exporter: {
-    type: 'vercel', // or 'otlp-http', 'none'
     batchSize: 100,
     batchTimeoutMs: 5000,
   },
@@ -100,14 +106,7 @@ await initNextDoctor({
     maxRetries: 5,
     initialDelayMs: 100,
     maxDelayMs: 30000,
-    backoffMultiplier: 2,
-    randomizationFactor: 0.1,
-  },
-
-  // Feature Flags
-  captureLogs: true,
-  captureMetrics: true,
-  captureExceptions: true,
+  }
 });
 ```
 
@@ -145,23 +144,34 @@ reportMetric('checkout.total', 12999, {
 });
 ```
 
-### `getHealthStatus()`
+### `npx nextdoctor-agent setup`
 
-Get real-time agent health information.
+Interactive wizard to configure the agent modules. Recommended for new installations.
 
-```typescript
-import { getHealthStatus } from '@codebaz/nextdoctor-agent';
-
-const health = getHealthStatus();
-console.log(health);
-// {
-//   initialized: true,
-//   isHealthy: true,
-//   exporterStatus: 'healthy',
-//   bufferedSpans: 42,
-//   errorCount: 0
-// }
+```bash
+npx nextdoctor-agent setup
 ```
+
+It will guide you through:
+- Setting your **Project Token**
+- Selecting **Modules** (DB, Profiling, RSC, Client)
+- Generating the optimal `instrumentation.ts` snippet
+
+### `npx nextdoctor-agent fix`
+
+Automated performance refactoring tool. Uses AST analysis to safely update your source code.
+
+```bash
+npx nextdoctor-agent fix [--dry-run]
+```
+
+**Currently supports:**
+- ⚡ **Fetch Caching**: Automatically adds `{ cache: 'force-cache' }` to plain `fetch()` calls in RSC.
+- ⚡ **Async Cookies**: Automatically adds `await` to `cookies()` calls for Next.js 15+ compatibility.
+- ⚡ **Directive Cleanup**: Identifies and removes unnecessary `'use client'` directives (components with no hooks or handlers).
+- ⚡ **Security Scan**: Detects sensitive keywords in `NEXT_PUBLIC_` environment variables.
+- ⚡ **Project Guard**: Flags missing `error.tsx` boundaries in route segments and missing CSP in `next.config.js`.
+
 
 ### `getDetectedIssues()`
 
@@ -194,20 +204,16 @@ console.log(metrics);
 //   cpu: {
 //     timestamp: 1712154800000,
 //     usage: 45.2,           // percentage 0-100
-//     coreCount: 4,
-//     systemLoadPerCore: 1.13,
-//     loadAverage: {
-//       oneMinute: 4.52,
-//       fiveMinutes: 3.89,
-//       fifteenMinutes: 2.45
-//     }
+//     loadAverage: { oneMinute: 4.52, fiveMinutes: 3.89, fifteenMinutes: 2.45 },
+//     coreCount: 8,
+//     systemLoadPerCore: 0.56
 //   },
 //   memory: {
 //     timestamp: 1712154800000,
 //     heapUsed: 124567890,    // bytes
 //     heapTotal: 536870912,
 //     heapUsagePercent: 23.2,
-//     systemMemoryUsed: 8589934592,    // bytes
+//     systemMemoryUsed: 8589934592,
 //     systemMemoryTotal: 34359738368,
 //     systemMemoryUsagePercent: 25.0
 //   },
@@ -236,7 +242,7 @@ console.log(health);
 
 #### `getSystemSummary()`
 
-Get a formatted dashboard-friendly summary.
+Get a formatted dashboard-friendly summary (includes human-readable sizes).
 
 ```typescript
 import { getSystemSummary } from '@codebaz/nextdoctor-agent';
@@ -244,23 +250,11 @@ import { getSystemSummary } from '@codebaz/nextdoctor-agent';
 const summary = getSystemSummary();
 console.log(summary);
 // {
-//   status: 'warning',
-//   cpu: {
-//     usage: '45.2%',
-//     cores: 4,
-//     load: { oneMinute: 4.52, fiveMinutes: 3.89, fifteenMinutes: 2.45 }
-//   },
+//   status: 'healthy',
+//   cpu: { usage: '45.2%', cores: 8, load: { ... } },
 //   memory: {
-//     heap: {
-//       used: '118.7 MB',
-//       total: '512 MB',
-//       usage: '23.2%'
-//     },
-//     system: {
-//       used: '8 GB',
-//       total: '32 GB',
-//       usage: '25.0%'
-//     }
+//     heap: { used: '118.7 MB', total: '512 MB', usage: '23.2%' },
+//     system: { used: '8 GB', total: '32 GB', usage: '25.0%' }
 //   },
 //   warnings: []
 // }
@@ -441,9 +435,9 @@ Detects `fetch()` calls in Server Components without cache directives, especiall
 - No `next.revalidate` specified
 - Filtered: Ignores POST/PUT/DELETE, internal URLs, and calls < 50ms
 
-#### 3. **Dynamic Route Candidate** (Unnecessary Dynamic Rendering)
+#### 3. **Dynamic Route Candidate** (Static Optimization)
 
-Detects when `cookies()` or `headers()` are called but never actually read specific values, forcing the entire page to be dynamic when it could be static.
+Detects when `cookies()` or `headers()` are invoked without accessing specific keys, which unnecessarily opts the entire page into dynamic rendering.
 
 **Example Detection:**
 ```json
@@ -452,14 +446,58 @@ Detects when `cookies()` or `headers()` are called but never actually read speci
   "severity": "warning",
   "message": "Unnecessary dynamic rendering: cookies() called but no specific key accessed",
   "route": "/products/[id]",
-  "suggestion": "Option 1: Remove the cookies() call if not needed\n\nOption 2: Move to Server Action:\n\n'use server';\nexport async function getUser() {\n  const sessionId = cookies().get('session')?.value;\n  // ...\n}\n\nOption 3: Add export const dynamic = 'force-static' if this route is truly static"
+  "suggestion": "If you don't need the cookies, remove the call. If you do, consider move it to a Server Action or use static generation if possible."
 }
 ```
 
 **When it triggers:**
-- `cookies()` or `headers()` function is invoked
-- No child span shows specific key access (e.g., `cookies().get('key')`)
-- Route contains `[` indicating dynamic segment
+- `cookies()` or `headers()` function is invoked.
+- No child span shows specific key access (e.g., `cookies().get('key')`).
+- Route contains dynamic segments (`[...]`).
+
+#### 4. **DB Performance (N+1 & Slow Queries)**
+
+Detects database anti-patterns by fingerprinting normalized SQL statements.
+
+**When it triggers:**
+- **N+1 Patterns**: The same SQL fingerprint is executed **5 or more times** in a single request.
+- **Slow Queries**: Any database operation exceeding **500ms**.
+- Supported: Prisma, PostgreSQL, MySQL.
+
+#### 5. **RSC Payload Bloat**
+
+Monitors the size of the React Server Component payload sent to the client.
+
+**When it triggers:**
+- RSC payload exceeds **250KB**.
+- Suggests avoiding passing entire database objects (bloat) to Client Components.
+
+#### 6. **Rendering Waterfall**
+Detects sequential `await` calls under the same parent span (e.g., fetching user then fetching posts instead of parallelizing).
+
+**When it triggers:**
+- 3 or more sequential long spans (> 100ms each) under a common parent.
+- Total waterfall chain duration > 300ms.
+
+#### 7. **Infrastructure & Runtime**
+Monitors for platform-specific anti-patterns and resource exhaustions.
+
+**When it triggers:**
+- **Node.js in Edge**: Using `fs`, `net`, or other Node modules in a route with `runtime: 'edge'`.
+- **Memory Leak**: Extrapolated heap growth exceeds **15% per hour** with no recovery.
+- **Long Transactions**: Database transactions kept open for more than **2 seconds**.
+
+#### 8. **Data Fetching Depth**
+- **Short Revalidate**: Flags routes with `next.revalidate < 10s`.
+- **Request Deduplication**: Identifies identical GET requests (same URL/Method) called multiple times in a single trace.
+
+#### 9. **Client/UX Vitals**
+Captures Core Web Vitals and interaction patterns from the browser.
+
+**When it triggers:**
+- **LCP (Largest Contentful Paint)**: > 2.5s.
+- **CLS (Cumulative Layout Shift)**: > 0.1.
+- **Excessive Re-renders**: Component renders **> 10 times** per interaction (via React-Scan).
 
 ### Accessing Detected Issues
 
@@ -524,20 +562,21 @@ The engine automatically:
 
 ### Supported Metrics
 
-- **API Latency**: HTTP request/response times
-- **Database Performance**: Query execution times
-- **Memory Usage**: Heap size and GC metrics
-- **Error Rates**: Exception tracking
-- **Custom Metrics**: Application-specific KPIs
+- **HTTP Latency**: Request/response timing across Edge and Node.js
+- **Database Performance**: Query execution times via Prisma, PG, and MySQL2
+- **System Resources**: CPU usage and load, Heap and System memory
+- **RSC Internals**: Metadata generation time and RSC payload size
+- **V8 Diagnostics**: Automated heap snapshots on critical memory usage
 
 ### Detected Issues
 
 The agent automatically detects:
-- Slow API routes (> 3s)
-- N+1 database queries
-- Memory leaks
-- Uncaught exceptions
-- External API timeouts
+- **N+1 Queries**: Duplicate database statements in a single request
+- **Slow Queries**: DB operations exceeding 500ms
+- **Uncached Fetches**: Network calls in RSC without cache directives
+- **Cold Starts**: Edge function startup latency (> 800ms)
+- **Dynamic Candidates**: Unnecessary dynamic rendering triggers
+- **RSC Bloat**: Large RSC payloads (> 250KB)
 
 ## Environment Variables
 
@@ -561,7 +600,7 @@ The agent automatically detects:
 - 📖 [Documentation](https://codebaz.com/nextdoctor)
 - 🐛 [Report Issues](https://github.com/codebaz/nextdoctor/issues)
 - 💬 [Discord Community](https://discord.gg/codebaz)
-- 📧 [Enterprise Support](mailto:enterprise@codebaz.com)
+- 📧 [Enterprise Support](mailto:enterprise@codebaz.cloud)
 
 ## License
 

@@ -15,28 +15,27 @@ export class ColdStartThresholdDetector extends BaseDetector {
     if (context.startupTimeMs && context.startupTimeMs > this.threshold) {
       issues.push({
         id: this.id,
+        type: 'COLD_START',
         severity: 'critical',
         message: `Edge cold start ${context.startupTimeMs}ms > ${this.threshold}ms → users are paying this cost on every cold invocation`,
-        suggestion: `Options in order of impact:
+        suggestion: `Opções por ordem de impacto:
 
-1. Move heavy imports outside the handler:
-// ❌ Inside the handler
+1. Mova imports pesados para fora do handler:
+// ❌ Dentro do handler
 export default async function handler(req, res) {
   const { heavy } = await import('./heavy-lib');
   return handleRequest(heavy, req);
 }
 
-// ✅ Outside the handler
+// ✅ Fora do handler (Pre-warmed)
 const heavyPromise = import('./heavy-lib');
 export default async function handler(req, res) {
   const { heavy } = await heavyPromise;
   return handleRequest(heavy, req);
 }
 
-2. Consider switching to Node.js runtime if Edge is not required:
-export const runtime = 'nodejs';
-
-3. Use route warming via a cron job to keep instances warm.`,
+2. Mude para runtime 'nodejs' se o Edge não for estritamente necessário.
+3. Configure 'Route Warming' para manter instâncias ativas.`,
         route: context.route,
         attributes: {
           startupTimeMs: context.startupTimeMs,
@@ -62,6 +61,7 @@ export const runtime = 'nodejs';
       if (variance > 2000) {
         issues.push({
           id: 'COLD_START_INTERMITTENT',
+          type: 'COLD_START_INTERMITTENT',
           severity: 'warning',
           message: `Route "${context.route || 'unknown'}" has high latency variance: P50=${Math.round(p50)}ms vs P99=${Math.round(p99)}ms → likely intermittent cold starts`,
           suggestion: `A difference > 2000ms between P50 and P99 indicates periodic cold starts. Consider these strategies:

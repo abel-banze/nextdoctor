@@ -4,6 +4,7 @@ export type IssueSeverity = 'info' | 'warning' | 'high' | 'critical';
 
 export interface DetectedIssue {
   id: string;
+  type: string;
   severity: IssueSeverity;
   message: string;
   suggestion: string;
@@ -24,6 +25,12 @@ export interface DetectorContext {
   route?: string;
   runtime: 'nodejs' | 'edge';
   startupTimeMs?: number;
+  systemMetrics?: {
+    cpuUsage: number;
+    memoryUsagePercent: number;
+    heapUsed: number;
+    heapTotal: number;
+  };
 }
 
 export interface IssueDeduplicationKey {
