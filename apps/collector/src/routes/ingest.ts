@@ -4,6 +4,7 @@ import { zValidator } from '@hono/zod-validator';
 import { db } from '../db/index.js';
 import { spans, issues } from '../db/schema.js';
 import { bearerAuth } from '../middleware/bearer-auth.js';
+import { sql } from 'drizzle-orm';
 import type { AppVariables } from '../types.js';
 
 const SpanSchema = z.object({
@@ -74,29 +75,44 @@ ingestRouter.post(
             route: (span.attributes?.['http.route'] as string | undefined) ?? body.context?.route ?? null,
             durationMs,
             payload: span,
+            runtime: body.context?.runtime ?? 'nodejs',
+            startupTimeMs: body.context?.startupTimeMs ?? null,
             receivedAt: now,
           };
         })
       );
     }
 
-    // Upsert detected issues
+    // Upsert detected issues — deduplicate based on (projectId, detectorId, route) where unresolved
     if (body.detectedIssues && body.detectedIssues.length > 0) {
-      await db.insert(issues).values(
-        body.detectedIssues.map((issue) => ({
-          tenantId,
-          projectId,
-          detectorId: issue.id,
-          severity: issue.severity,
-          message: issue.message,
-          suggestion: issue.suggestion,
-          route: issue.route ?? null,
-          attributes: issue.attributes ?? null,
-          firstDetectedAt: new Date(issue.detectedAt),
-          lastDetectedAt: new Date(issue.detectedAt),
-          count: 1,
-        }))
-      );
+      for (const issue of body.detectedIssues) {
+        await db
+          .insert(issues)
+          .values({
+            tenantId,
+            projectId,
+            detectorId: issue.id,
+            severity: issue.severity,
+            message: issue.message,
+            suggestion: issue.suggestion,
+            route: issue.route ?? null,
+            attributes: issue.attributes ?? null,
+            firstDetectedAt: new Date(issue.detectedAt),
+            lastDetectedAt: new Date(issue.detectedAt),
+            count: 1,
+          })
+          .onConflictDoUpdate({
+            target: [issues.projectId, issues.detectorId, issues.route],
+            where: sql`resolved_at IS NULL`,
+            set: {
+              lastDetectedAt: new Date(issue.detectedAt),
+              count: sql`${issues.count} + 1`,
+              message: issue.message,
+              suggestion: issue.suggestion,
+              attributes: issue.attributes ?? null,
+            },
+          });
+      }
     }
 
     return c.json({ accepted: body.spans.length }, 202);

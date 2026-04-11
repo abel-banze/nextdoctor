@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm';
 import {
   pgTable,
   text,
@@ -256,6 +257,8 @@ export const spans = pgTable('spans', {
   durationMs: integer('duration_ms'),               // pre-computed for fast queries
   payload: jsonb('payload').notNull(),              // full OTel span JSON
   receivedAt: timestamp('received_at').notNull().defaultNow(),
+  runtime: text('runtime', { enum: ['nodejs', 'edge'] }),
+  startupTimeMs: integer('startup_time_ms'),
 }, (t) => [
   index('spans_tenant_project_idx').on(t.tenantId, t.projectId),
   index('spans_trace_id_idx').on(t.traceId),
@@ -263,6 +266,7 @@ export const spans = pgTable('spans', {
   index('spans_received_at_idx').on(t.receivedAt),
   index('spans_route_idx').on(t.route),
   index('spans_name_idx').on(t.name),
+  index('spans_runtime_idx').on(t.runtime),
 ]);
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -304,8 +308,10 @@ export const issues = pgTable('issues', {
   index('issues_last_detected_idx').on(t.lastDetectedAt),
   index('issues_route_idx').on(t.route),
   index('issues_deploy_id_idx').on(t.deployId),
-  // Composite index for deduplication lookups
-  index('issues_dedup_idx').on(t.projectId, t.detectorId, t.route),
+  // Composite unique index for deduplication of active (unresolved) issues
+  uniqueIndex('issues_dedup_idx')
+    .on(t.projectId, t.detectorId, t.route)
+    .where(sql`resolved_at IS NULL`),
 ]);
 
 // ─────────────────────────────────────────────────────────────────────────────
