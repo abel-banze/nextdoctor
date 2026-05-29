@@ -1,7 +1,14 @@
 import type { NextConfig } from "next";
 
-const collectorOrigin = (process.env.COLLECTOR_ORIGIN || process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001")
-  .replace(/\/+$/, "")
+const normalizeOrigin = (value?: string) =>
+  value?.trim().replace(/\/api\/?$/, "").replace(/\/+$/, "") || ""
+
+const collectorOrigin = normalizeOrigin(
+  process.env.COLLECTOR_ORIGIN ||
+    process.env.NEXT_PUBLIC_COLLECTOR_URL ||
+    process.env.NEXT_PUBLIC_API_URL ||
+    "http://localhost:3001",
+)
 
 const nextConfig: NextConfig = {
   async rewrites() {

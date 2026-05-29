@@ -1,7 +1,14 @@
 import { cookies } from "next/headers"
 
-const ORIGIN = (process.env.COLLECTOR_ORIGIN || process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001")
-  .replace(/\/+$/, "")
+const normalizeOrigin = (value?: string) =>
+  value?.trim().replace(/\/api\/?$/, "").replace(/\/+$/, "") || ""
+
+const ORIGIN = normalizeOrigin(
+  process.env.COLLECTOR_ORIGIN ||
+    process.env.NEXT_PUBLIC_COLLECTOR_URL ||
+    process.env.NEXT_PUBLIC_API_URL ||
+    "http://localhost:3001",
+)
 
 export function apiUrl(path: string) {
   return `/api${path}`
