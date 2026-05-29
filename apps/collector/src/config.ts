@@ -6,6 +6,8 @@ const envSchema = z.object({
   NEXTDOCTOR_SECRET: z.string().min(32),
   BETTER_AUTH_SECRET: z.string().min(32),
   BETTER_AUTH_URL: z.string().default('http://localhost:3001'),
+  GITHUB_CLIENT_ID: z.string().optional(),
+  GITHUB_CLIENT_SECRET: z.string().optional(),
   ANTHROPIC_API_KEY: z.string().optional(),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
 });

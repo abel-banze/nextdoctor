@@ -4,6 +4,15 @@ import { db } from '../db/index.js';
 import * as schema from '../db/schema.js';
 import { env } from '../config.js';
 
+const socialProviders = env.GITHUB_CLIENT_ID && env.GITHUB_CLIENT_SECRET
+  ? {
+      github: {
+        clientId: env.GITHUB_CLIENT_ID,
+        clientSecret: env.GITHUB_CLIENT_SECRET,
+      },
+    }
+  : undefined;
+
 export const auth = betterAuth({
   database: drizzleAdapter(db, {
     provider: 'pg',
@@ -20,6 +29,7 @@ export const auth = betterAuth({
   emailAndPassword: {
     enabled: true,
   },
+  socialProviders,
   trustedOrigins: ['http://localhost:3000', 'https://app.nextdoctor.dev'],
 });
 

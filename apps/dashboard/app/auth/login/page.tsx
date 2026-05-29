@@ -11,6 +11,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState("")
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
+  const [githubLoading, setGithubLoading] = useState(false)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -28,6 +29,22 @@ export default function LoginPage() {
 
     router.push("/")
     router.refresh()
+  }
+
+  async function handleGitHubLogin() {
+    setError("")
+    setGithubLoading(true)
+
+    const { error: err } = await authClient.signIn.social({
+      provider: "github",
+      callbackURL: "/",
+    })
+
+    setGithubLoading(false)
+
+    if (err) {
+      setError(err.message ?? "Failed to sign in with GitHub")
+    }
   }
 
   return (
@@ -84,6 +101,24 @@ export default function LoginPage() {
           {loading ? "Signing in..." : "Sign in"}
         </button>
       </form>
+
+      <div className="relative">
+        <div className="absolute inset-0 flex items-center">
+          <span className="w-full border-t" />
+        </div>
+        <div className="relative flex justify-center text-xs uppercase">
+          <span className="bg-background px-2 text-muted-foreground">Or continue with</span>
+        </div>
+      </div>
+
+      <button
+        type="button"
+        onClick={handleGitHubLogin}
+        disabled={githubLoading}
+        className="inline-flex h-9 items-center justify-center rounded-lg border border-input bg-background px-4 text-sm font-medium transition-all hover:bg-muted focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50"
+      >
+        {githubLoading ? "Redirecting to GitHub..." : "Continue with GitHub"}
+      </button>
 
       <p className="text-center text-sm text-muted-foreground">
         Don&apos;t have an account?{" "}

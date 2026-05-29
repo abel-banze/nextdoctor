@@ -7,6 +7,87 @@ export interface GitHubFileContent {
   url: string;
 }
 
+export interface GitHubRepository {
+  id: number;
+  name: string;
+  owner: string;
+  fullName: string;
+  defaultBranch: string;
+  htmlUrl: string;
+  isPrivate: boolean;
+}
+
+async function githubApiRequest<T>(path: string, accessToken: string): Promise<T> {
+  const response = await fetch(`https://api.github.com${path}`, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      Accept: 'application/vnd.github+json',
+      'X-GitHub-Api-Version': '2022-11-28',
+      'User-Agent': 'nextdoctor-collector/1.0',
+    },
+  });
+
+  const body = await response.text();
+
+  if (!response.ok) {
+    throw new Error(`GitHub API error ${response.status} for ${path}: ${body}`);
+  }
+
+  return JSON.parse(body) as T;
+}
+
+export async function fetchGitHubRepos(accessToken: string): Promise<GitHubRepository[]> {
+  const repos = await githubApiRequest<Array<{
+    id: number;
+    name: string;
+    full_name: string;
+    private: boolean;
+    default_branch: string;
+    html_url: string;
+    owner: {
+      login: string;
+    };
+  }>>('/user/repos?per_page=100&sort=updated&visibility=all', accessToken);
+
+  return repos.map((repo) => ({
+    id: repo.id,
+    name: repo.name,
+    owner: repo.owner.login,
+    fullName: repo.full_name,
+    defaultBranch: repo.default_branch,
+    htmlUrl: repo.html_url,
+    isPrivate: repo.private,
+  }));
+}
+
+export async function fetchGitHubRepository(
+  owner: string,
+  name: string,
+  accessToken: string,
+): Promise<GitHubRepository> {
+  const repo = await githubApiRequest<{
+    id: number;
+    name: string;
+    full_name: string;
+    private: boolean;
+    default_branch: string;
+    html_url: string;
+    owner: {
+      login: string;
+    };
+  }>(`/repos/${owner}/${name}`, accessToken);
+
+  return {
+    id: repo.id,
+    name: repo.name,
+    owner: repo.owner.login,
+    fullName: repo.full_name,
+    defaultBranch: repo.default_branch,
+    htmlUrl: repo.html_url,
+    isPrivate: repo.private,
+  };
+}
+
 /**
  * Fetch raw file content from a GitHub repository using the GitHub API.
  * Uses an encrypted access token stored in github_connections.
@@ -24,28 +105,13 @@ export async function fetchGitHubFile(
   ref: string,
   accessToken: string,
 ): Promise<GitHubFileContent> {
-  const url = `https://api.github.com/repos/${repoOwner}/${repoName}/contents/${filePath}?ref=${ref}`;
-
-  const response = await fetch(url, {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      Accept: 'application/vnd.github.v3+json',
-      'User-Agent': 'nextdoctor-collector/1.0',
-    },
-  });
-
-  if (!response.ok) {
-    const body = await response.text().catch(() => '');
-    throw new Error(`GitHub API error ${response.status} for ${filePath}: ${body}`);
-  }
-
-  const data = await response.json() as {
+  const data = await githubApiRequest<{
     path: string;
     sha: string;
     html_url: string;
     content: string;
     encoding: string;
-  };
+  }>(`/repos/${repoOwner}/${repoName}/contents/${filePath}?ref=${encodeURIComponent(ref)}`, accessToken);
 
   if (data.encoding !== 'base64') {
     throw new Error(`Unexpected encoding from GitHub: ${data.encoding}`);

@@ -4,6 +4,7 @@ import { useState, useEffect, use } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { CopyButton } from "@/components/copy-button"
+import { authClient } from "@/lib/auth-client"
 
 interface Project {
   id: string
@@ -20,6 +21,28 @@ interface Token {
   createdAt: string
 }
 
+interface GithubConnection {
+  id: string
+  projectId: string
+  tenantId: string
+  repoOwner: string
+  repoName: string
+  defaultBranch: string
+  repoUrl: string | null
+  isPrivate: boolean
+  connectedAt: string
+}
+
+interface GithubRepository {
+  id: number
+  name: string
+  owner: string
+  fullName: string
+  defaultBranch: string
+  htmlUrl: string
+  isPrivate: boolean
+}
+
 export default function ProjectSettingsPage({
   params,
 }: {
@@ -34,6 +57,13 @@ export default function ProjectSettingsPage({
   const [error, setError] = useState("")
   const [rotating, setRotating] = useState(false)
   const [newToken, setNewToken] = useState<string | null>(null)
+  const [githubConnection, setGithubConnection] = useState<GithubConnection | null>(null)
+  const [githubRepositories, setGithubRepositories] = useState<GithubRepository[]>([])
+  const [githubLoading, setGithubLoading] = useState(false)
+  const [githubConnectLoading, setGithubConnectLoading] = useState(false)
+  const [githubDisconnectLoading, setGithubDisconnectLoading] = useState(false)
+  const [selectedRepo, setSelectedRepo] = useState("")
+  const [githubAccountLoading, setGithubAccountLoading] = useState(false)
 
   const [refreshKey, setRefreshKey] = useState(0)
 
@@ -65,6 +95,8 @@ export default function ProjectSettingsPage({
 
         if (!cancelled) setProject(found)
 
+        await loadGithubState(found.id)
+
         const tokensRes = await fetch(
           `${process.env.NEXT_PUBLIC_API_URL}/projects/${found.id}/tokens`,
           { credentials: "include" },
@@ -84,6 +116,136 @@ export default function ProjectSettingsPage({
     load()
     return () => { cancelled = true }
   }, [slug, refreshKey, router])
+
+  async function loadGithubState(projectId = project?.id) {
+    if (!projectId) return
+
+    setGithubLoading(true)
+
+    try {
+      const connectionRes = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/projects/${projectId}/github`,
+        { credentials: "include" },
+      )
+
+      if (connectionRes.ok) {
+        const connectionData = await connectionRes.json()
+        setGithubConnection(connectionData.connection)
+      } else {
+        const connectionData = await connectionRes.json().catch(() => null)
+        if (connectionData?.error === "GitHub account not connected") {
+          setGithubConnection(null)
+        }
+      }
+
+      const repositoriesRes = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/projects/${projectId}/github/repos`,
+        { credentials: "include" },
+      )
+
+      if (repositoriesRes.ok) {
+        const repositoriesData = await repositoriesRes.json()
+        setGithubRepositories(repositoriesData.repositories ?? [])
+      } else {
+        setGithubRepositories([])
+      }
+    } catch {
+      setGithubRepositories([])
+    } finally {
+      setGithubLoading(false)
+    }
+  }
+
+  async function handleConnectGithubAccount() {
+    setGithubAccountLoading(true)
+
+    const { error } = await authClient.signIn.social({
+      provider: "github",
+      callbackURL: `/projects/${slug}/settings`,
+    })
+
+    setGithubAccountLoading(false)
+
+    if (error) {
+      setError(error.message ?? "Failed to connect GitHub")
+    }
+  }
+
+  async function handleConnectRepository() {
+    if (!project) return
+
+    const repository = githubRepositories.find((repo) => repo.fullName === selectedRepo)
+    if (!repository) return
+
+    setGithubConnectLoading(true)
+
+    try {
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/projects/${project.id}/github`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ owner: repository.owner, name: repository.name }),
+        },
+      )
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        setError(data.error ?? "Failed to connect repository")
+        return
+      }
+
+      setGithubConnection(data.connection)
+      setSelectedRepo(data.connection?.repoOwner && data.connection?.repoName ? `${data.connection.repoOwner}/${data.connection.repoName}` : "")
+      setRefreshKey((key) => key + 1)
+    } catch {
+      setError("Connection error. Is the collector running?")
+    } finally {
+      setGithubConnectLoading(false)
+    }
+  }
+
+  async function handleDisconnectRepository() {
+    if (!project) return
+
+    setGithubDisconnectLoading(true)
+
+    try {
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/projects/${project.id}/github`,
+        {
+          method: "DELETE",
+          credentials: "include",
+        },
+      )
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        setError(data.error ?? "Failed to disconnect repository")
+        return
+      }
+
+      setGithubConnection(null)
+      setSelectedRepo("")
+      setRefreshKey((key) => key + 1)
+    } catch {
+      setError("Connection error. Is the collector running?")
+    } finally {
+      setGithubDisconnectLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (githubConnection) {
+      setSelectedRepo(`${githubConnection.repoOwner}/${githubConnection.repoName}`)
+      return
+    }
+
+    setSelectedRepo("")
+  }, [githubConnection])
 
   async function handleRotate() {
     if (!project) return
@@ -162,6 +324,103 @@ export default function ProjectSettingsPage({
             <span className="text-sm text-muted-foreground">Slug</span>
             <span className="text-sm font-medium">{project?.slug}</span>
           </div>
+        </div>
+      </section>
+
+      {/* GitHub repository */}
+      <section className="mb-8">
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-lg font-semibold">GitHub repository</h2>
+          <button
+            type="button"
+            onClick={handleConnectGithubAccount}
+            disabled={githubAccountLoading}
+            className="inline-flex h-8 items-center justify-center rounded-lg border border-input bg-background px-3 text-xs font-medium transition-all hover:bg-muted disabled:pointer-events-none disabled:opacity-50"
+          >
+            {githubAccountLoading ? "Connecting..." : githubConnection ? "Reconnect GitHub" : "Connect GitHub account"}
+          </button>
+        </div>
+
+        <div className="rounded-xl border bg-card p-4">
+          {githubLoading ? (
+            <p className="text-sm text-muted-foreground">Loading GitHub status...</p>
+          ) : githubConnection ? (
+            <div className="flex flex-col gap-3">
+              <div className="rounded-lg bg-green-50 px-3 py-2 text-sm text-green-800 dark:bg-green-950/30 dark:text-green-300">
+                Connected to <span className="font-semibold">{githubConnection.repoOwner}/{githubConnection.repoName}</span>
+                {githubConnection.defaultBranch ? ` · ${githubConnection.defaultBranch}` : ""}
+              </div>
+
+              <div className="flex items-center gap-2">
+                <label htmlFor="github-repo" className="text-sm font-medium">Switch repository</label>
+                <select
+                  id="github-repo"
+                  value={selectedRepo}
+                  onChange={(e) => setSelectedRepo(e.target.value)}
+                  className="rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                >
+                  <option value="">Select a repository</option>
+                  {githubRepositories.map((repository) => (
+                    <option key={repository.id} value={repository.fullName}>
+                      {repository.fullName}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={handleConnectRepository}
+                  disabled={githubConnectLoading || !selectedRepo}
+                  className="inline-flex h-9 items-center justify-center rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground transition-all hover:bg-primary/80 disabled:pointer-events-none disabled:opacity-50"
+                >
+                  {githubConnectLoading ? "Saving..." : "Save repository"}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleDisconnectRepository}
+                  disabled={githubDisconnectLoading}
+                  className="inline-flex h-9 items-center justify-center rounded-lg border border-input bg-background px-4 text-sm font-medium transition-all hover:bg-muted disabled:pointer-events-none disabled:opacity-50"
+                >
+                  {githubDisconnectLoading ? "Disconnecting..." : "Disconnect"}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-3">
+              <p className="text-sm text-muted-foreground">
+                Connect your GitHub account and choose the repository linked to this project.
+              </p>
+
+              <div className="flex flex-col gap-2">
+                <label htmlFor="github-repo" className="text-sm font-medium">Repository</label>
+                <select
+                  id="github-repo"
+                  value={selectedRepo}
+                  onChange={(e) => setSelectedRepo(e.target.value)}
+                  className="rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                >
+                  <option value="">Select a repository</option>
+                  {githubRepositories.map((repository) => (
+                    <option key={repository.id} value={repository.fullName}>
+                      {repository.fullName}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleConnectRepository}
+                disabled={githubConnectLoading || !selectedRepo}
+                className="inline-flex h-9 items-center justify-center rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground transition-all hover:bg-primary/80 disabled:pointer-events-none disabled:opacity-50"
+              >
+                {githubConnectLoading ? "Saving..." : "Connect repository"}
+              </button>
+            </div>
+          )}
         </div>
       </section>
 
