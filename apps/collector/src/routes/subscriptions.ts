@@ -22,7 +22,7 @@ subscriptionsRouter.get('/current', async (c) => {
     .limit(1);
 
   if (!sub) {
-    return c.json({ plan: 'free', status: 'active', externalId: null });
+    return c.json({ plan: 'free', status: 'active' });
   }
 
   return c.json({
