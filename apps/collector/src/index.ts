@@ -18,7 +18,7 @@ const app = new Hono();
 // ─── Global middleware ────────────────────────────────────────────────────────
 app.use('*', logger());
 app.use('*', cors({
-  origin: ['http://localhost:3000', 'https://app.nextdoctor.dev'],
+  origin: ['http://localhost:3000', 'https://nextdoctor.codebaz.cloud'],
   credentials: true,
 }));
 

@@ -29,6 +29,12 @@ export const auth = betterAuth({
   emailAndPassword: {
     enabled: true,
   },
+  advanced: {
+    defaultCookieAttributes: {
+      sameSite: 'none',
+      secure: true,
+    },
+  },
   socialProviders,
   trustedOrigins: ['http://localhost:3000', 'https://api-nextdoctor.codebaz.cloud', 'https://nextdoctor.codebaz.cloud'],
 });
