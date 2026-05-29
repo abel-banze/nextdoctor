@@ -24,6 +24,7 @@ export {
 } from './types.js';
 
 export {
+  withNextDoctorAppRoute,
   withNextDoctorMonitoring,
   withNextDoctorTiming,
 } from './middleware.js';

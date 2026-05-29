@@ -59,7 +59,7 @@ projectsRouter.post(
     await db.insert(projectTokens).values({
       projectId: project!.id,
       tenantId,
-      token: tokenHash,
+      tokenHash: tokenHash,
       hint: rawToken.slice(-4),
       label: 'Default key',
     });
@@ -83,6 +83,20 @@ projectsRouter.delete('/:id', async (c) => {
   }
 
   return c.json({ deleted: deleted.id });
+});
+
+// List tokens for a project
+projectsRouter.get('/:id/tokens', async (c) => {
+  const tenantId = c.get('tenantId') as string;
+  const projectId = c.req.param('id');
+
+  const rows = await db
+    .select({ id: projectTokens.id, hint: projectTokens.hint, label: projectTokens.label, isActive: projectTokens.isActive, lastUsedAt: projectTokens.lastUsedAt, createdAt: projectTokens.createdAt })
+    .from(projectTokens)
+    .where(and(eq(projectTokens.projectId, projectId), eq(projectTokens.tenantId, tenantId)))
+    .orderBy(projectTokens.createdAt);
+
+  return c.json({ tokens: rows });
 });
 
 // Rotate / create a new API token for a project
@@ -114,7 +128,7 @@ projectsRouter.post('/:id/tokens', async (c) => {
   const [token] = await db.insert(projectTokens).values({
     projectId,
     tenantId,
-    token: tokenHash,
+    tokenHash: tokenHash,
     hint: rawToken.slice(-4),
     label: 'Rotated key',
   }).returning({ id: projectTokens.id, hint: projectTokens.hint, createdAt: projectTokens.createdAt });

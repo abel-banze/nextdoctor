@@ -25,7 +25,7 @@ export async function bearerAuth(c: Context, next: Next) {
   const [row] = await db
     .select()
     .from(projectTokens)
-    .where(and(eq(projectTokens.token, tokenHash), eq(projectTokens.isActive, true)))
+    .where(and(eq(projectTokens.tokenHash, tokenHash), eq(projectTokens.isActive, true)))
     .limit(1);
 
   if (!row) {

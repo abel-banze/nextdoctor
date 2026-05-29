@@ -69,6 +69,7 @@ class NextDoctorAgent {
       logLevel: LogLevelEnum.INFO,
       samplingRate: 1.0,
       timeout: 30000,
+      endpoint: 'https://api-nextdoctor.codebaz.cloud',
       ...config,
     };
     this.logLevel = this.config.logLevel || LogLevelEnum.INFO;
@@ -90,9 +91,6 @@ class NextDoctorAgent {
     if (!config.projectToken) {
       throw new Error('NextDoctor: projectToken is required');
     }
-    if (!config.endpoint) {
-      throw new Error('NextDoctor: endpoint is required');
-    }
     if (config.samplingRate !== undefined && (config.samplingRate < 0 || config.samplingRate > 1)) {
       throw new Error('NextDoctor: samplingRate must be between 0 and 1');
     }
@@ -113,7 +111,7 @@ class NextDoctorAgent {
 
   private createTraceExporter(): NextDoctorExporter {
     return new NextDoctorExporter({
-      endpoint: this.config.endpoint,
+      endpoint: this.config.endpoint ?? 'https://api-nextdoctor.codebaz.cloud',
       projectToken: this.config.projectToken,
       getIssues: () => this.detectedIssues,
       clearIssues: (sent) => {
@@ -137,6 +135,7 @@ class NextDoctorAgent {
         };
       },
       timeoutMs: this.config.timeout ?? 10_000,
+      piiSanitization: this.config.piiSanitization,
     });
   }
 
@@ -224,7 +223,8 @@ class NextDoctorAgent {
       return;
     }
 
-    try {
+    let attempt = 0;
+    while (true) {
       try {
         this.log(LogLevelEnum.DEBUG, 'Initializing NextDoctor agent...');
 
@@ -240,7 +240,7 @@ class NextDoctorAgent {
           forceFlush: async () => {},
           onStart: () => {},
           onEnd: (span) => {
-             this.analyzeSpanFromProcessor(span);
+            this.analyzeSpanFromProcessor(span);
           },
           shutdown: async () => {},
         };
@@ -280,7 +280,10 @@ class NextDoctorAgent {
           }
         });
 
+        // SUCCESS — set initialized INSIDE the try block
+        this.initialized = true;
         this.health.initialized = true;
+        
         if (modules.profiling && process.env.NEXT_RUNTIME === 'nodejs') {
           this.memoryRescue.start();
         }
@@ -296,34 +299,38 @@ class NextDoctorAgent {
               agentSampler.setRate(0);
             } else if (metrics.cpu.usage > 70) {
               const currentRate = this.config.samplingRate ?? 1.0;
-              agentSampler.setRate(currentRate * 0.2); // Throttle to 20% of target
+              agentSampler.setRate(currentRate * 0.2);
             } else {
               agentSampler.setRate(this.config.samplingRate ?? 1.0);
             }
-          }, 10000); // Check every 10s
+          }, 10000);
         }
-      } catch (retryError) {
-        this.health.errorCount++;
-        if (this.health.errorCount < this.retryPolicy.maxRetries) {
-          this.log(LogLevelEnum.WARN, `Initialization attempt failed, retrying... (${this.health.errorCount}/${this.retryPolicy.maxRetries})`, {
-            error: retryError instanceof Error ? retryError.message : String(retryError),
-          });
-          await new Promise(resolve => setTimeout(resolve, 100 * Math.pow(2, this.health.errorCount)));
-          throw retryError;
+
+        return; // success — exit loop
+
+      } catch (error) {
+        attempt++;
+        this.health.errorCount = attempt;
+
+        if (attempt > this.retryPolicy.maxRetries) {
+          this.health.initialized = false;
+          this.health.isHealthy = false;
+          this.health.exporterStatus = 'unreachable';
+
+          const message = error instanceof Error ? error.message : String(error);
+          this.log(LogLevelEnum.ERROR, 'Failed to initialize NextDoctor agent', { error: message });
+          throw error;
         }
-        throw retryError;
+
+        const delay = Math.min(
+          this.retryPolicy.initialDelayMs * Math.pow(this.retryPolicy.backoffMultiplier, attempt - 1),
+          this.retryPolicy.maxDelayMs,
+        );
+        this.log(LogLevelEnum.WARN, `Initialization attempt ${attempt} failed, retrying in ${delay}ms...`, {
+          error: error instanceof Error ? error.message : String(error),
+        });
+        await new Promise(resolve => setTimeout(resolve, delay));
       }
-
-      this.initialized = true;
-    } catch (error) {
-      this.health.initialized = false;
-      this.health.isHealthy = false;
-      this.health.exporterStatus = 'unreachable';
-      this.health.errorCount++;
-
-      const message = error instanceof Error ? error.message : String(error);
-      this.log(LogLevelEnum.ERROR, 'Failed to initialize NextDoctor agent', { error: message });
-      throw error;
     }
   }
 

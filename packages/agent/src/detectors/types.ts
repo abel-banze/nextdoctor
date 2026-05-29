@@ -31,11 +31,13 @@ export interface DetectorContext {
     heapUsed: number;
     heapTotal: number;
   };
+  projectId?: string;
 }
 
 export interface IssueDeduplicationKey {
   id: string;
   route?: string;
+  projectId?: string;
 }
 
 export interface DedupedIssue extends DetectedIssue {

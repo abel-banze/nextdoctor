@@ -29,6 +29,7 @@ subscriptionsRouter.get('/current', async (c) => {
     plan: sub.plan,
     status: sub.status,
     currentPeriodEnd: sub.currentPeriodEnd,
-    externalId: sub.externalId,
+    dodoCustomerId: sub.dodoCustomerId,
+    dodoSubscriptionId: sub.dodoSubscriptionId,
   });
 });

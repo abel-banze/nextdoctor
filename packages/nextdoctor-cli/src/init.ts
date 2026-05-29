@@ -2,6 +2,7 @@ import { spawnSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import inquirer from 'inquirer';
+import semver from 'semver';
 
 type PackageManager = 'pnpm' | 'npm' | 'yarn';
 type HostProvider = 'vercel' | 'self-host';
@@ -41,6 +42,72 @@ function safeWriteFile(filePath: string, content: string): void {
 function assertNextPresent(pkgJson: any): boolean {
   const deps = Object.assign({}, pkgJson.dependencies, pkgJson.devDependencies, pkgJson.peerDependencies);
   return !!deps?.next;
+}
+
+function getNextVersion(pkgJson: Record<string, unknown>): string | null {
+  const deps = Object.assign(
+    {},
+    pkgJson.dependencies as Record<string, string> | undefined,
+    pkgJson.devDependencies as Record<string, string> | undefined,
+    pkgJson.peerDependencies as Record<string, string> | undefined,
+  );
+  const raw = deps?.next;
+  if (!raw) return null;
+  return semver.coerce(raw)?.version ?? null;
+}
+
+function assertNextVersion(pkgJson: Record<string, unknown>): void {
+  const version = getNextVersion(pkgJson);
+  if (!version) {
+    console.warn('warning: não foi possível determinar a versão do Next.js.');
+    return;
+  }
+  if (semver.lt(version, '13.4.0')) {
+    console.warn(
+      `warning: Next.js ${version} não suporta o Instrumentation Hook. Versão mínima: 13.4.0.`,
+    );
+  }
+}
+
+function configureNextConfig(target: string, pkgJson: Record<string, unknown>): void {
+  const version = getNextVersion(pkgJson);
+  if (!version || !semver.lt(version, '15.0.0')) return;
+
+  const configTsPath = path.join(target, 'next.config.ts');
+  const configJsPath = path.join(target, 'next.config.js');
+
+  const existingPath = fs.existsSync(configTsPath) ? configTsPath
+    : fs.existsSync(configJsPath) ? configJsPath
+    : null;
+
+  if (existingPath) {
+    const content = fs.readFileSync(existingPath, 'utf8');
+    if (content.includes('instrumentationHook')) {
+      console.log(`skip: instrumentationHook já configurado em ${path.basename(existingPath)}`);
+      return;
+    }
+    // Try to add to existing experimental block
+    const updated = content.replace(
+      /experimental\s*:\s*\{/,
+      'experimental: {\n    instrumentationHook: true,',
+    );
+    if (updated !== content) {
+      fs.writeFileSync(existingPath, updated, 'utf8');
+      console.log(`updated: ${path.basename(existingPath)} — adicionado instrumentationHook: true`);
+      return;
+    }
+  }
+
+  // Create minimal next.config.js
+  safeWriteFile(configJsPath, `/** @type {import('next').NextConfig} */
+const nextConfig = {
+  experimental: {
+    instrumentationHook: true,
+  },
+};
+
+module.exports = nextConfig;
+`);
 }
 
 function generateInstrumentation(endpoint: string): string {
@@ -96,7 +163,7 @@ export async function runInit(args: string[]): Promise<void> {
     },
   ]);
 
-  let endpoint = 'https://ingest.nextdoctor.dev';
+  let endpoint = 'https://api-nextdoctor.codebaz.cloud';
 
   if (hosting === 'self-host') {
     const result = await inquirer.prompt<{ endpoint: string }>([
@@ -130,6 +197,9 @@ export async function runInit(args: string[]): Promise<void> {
 
   const packageManager = detectPackageManager(target);
   console.log(`Using package manager: ${packageManager}`);
+
+  assertNextVersion(pkgJson);
+  configureNextConfig(target, pkgJson);
 
   const depCommand = packageManager === 'pnpm' 
     ? ['add', packageName] 

@@ -5,7 +5,8 @@ const envSchema = z.object({
   PORT: z.coerce.number().default(3001),
   NEXTDOCTOR_SECRET: z.string().min(32),
   BETTER_AUTH_SECRET: z.string().min(32),
-  ANTHROPIC_API_KEY: z.string().optional(), // required when AI Doctor feature is used
+  BETTER_AUTH_URL: z.string().default('http://localhost:3001'),
+  ANTHROPIC_API_KEY: z.string().optional(),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
 });
 

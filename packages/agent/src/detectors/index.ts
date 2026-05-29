@@ -45,7 +45,7 @@ export class DetectionEngine {
     }
 
     // Deduplicate within the window
-    const deduped = this.deduplicateIssues(allIssues);
+    const deduped = this.deduplicateIssues(allIssues, context.projectId);
 
     // Sort by severity: critical > high > warning > info
     const severityOrder = { critical: 0, high: 1, warning: 2, info: 3 };
@@ -58,7 +58,7 @@ export class DetectionEngine {
     return deduped;
   }
 
-  private deduplicateIssues(issues: DetectedIssue[]): DetectedIssue[] {
+  private deduplicateIssues(issues: DetectedIssue[], projectId?: string): DetectedIssue[] {
     const now = Date.now();
     const dedupedMap = new Map<string, DedupedIssue>();
 
@@ -71,7 +71,7 @@ export class DetectionEngine {
 
     // Process new issues
     for (const issue of issues) {
-      const key = this.getDeduplicationKey(issue);
+      const key = this.getDeduplicationKey(issue, projectId);
       const existingCached = this.issueCache.get(key);
 
       if (existingCached) {
@@ -97,10 +97,11 @@ export class DetectionEngine {
     return Array.from(dedupedMap.values());
   }
 
-  private getDeduplicationKey(issue: DetectedIssue): string {
+  private getDeduplicationKey(issue: DetectedIssue, projectId?: string): string {
     const key: IssueDeduplicationKey = {
       id: issue.id,
       route: issue.route,
+      projectId,
     };
     return JSON.stringify(key);
   }

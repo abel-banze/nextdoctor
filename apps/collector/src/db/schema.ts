@@ -99,6 +99,7 @@ export const accounts = pgTable('accounts', {
     .references(() => users.id, { onDelete: 'cascade' }),
   accountId: text('account_id').notNull(),
   providerId: text('provider_id').notNull(),    // 'github', 'google', etc.
+  password: text('password'),                   // hashed password for credential provider
   accessToken: text('access_token'),
   refreshToken: text('refresh_token'),
   accessTokenExpiresAt: timestamp('access_token_expires_at'),
@@ -163,7 +164,7 @@ export const projectTokens = pgTable('project_tokens', {
   tenantId: uuid('tenant_id')
     .notNull()
     .references(() => tenants.id, { onDelete: 'cascade' }),
-  tokenHash: text('token_hash').notNull().unique(), // bcrypt hash of the raw token
+  tokenHash: text('token_hash').notNull().unique(), // sha256 hash of the raw token
   hint: text('hint').notNull(),                     // last 4 chars, shown in dashboard
   label: text('label'),                             // e.g. 'Production key'
   isActive: boolean('is_active').notNull().default(true),

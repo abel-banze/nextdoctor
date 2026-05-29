@@ -11,6 +11,7 @@ import { issuesRouter } from './routes/issues.js';
 import { tenantsRouter } from './routes/tenants.js';
 import { subscriptionsRouter } from './routes/subscriptions.js';
 import { aiRouter } from './routes/ai.js';
+import { sessionMiddleware } from './middleware/session.js';
 
 const app = new Hono();
 
@@ -25,16 +26,31 @@ app.use('*', cors({
 app.get('/', (c) => c.json({ status: 'ok', service: 'nextdoctor-collector' }));
 
 // ─── Better Auth handler ──────────────────────────────────────────────────────
-// Handles /auth/** (sign-in, sign-up, session, etc.)
-app.on(['GET', 'POST'], '/auth/**', (c) => auth.handler(c.req.raw));
+// Handles /auth/* (sign-in, sign-up, session, etc.)
+app.all('/auth/*', async (c) => {
+  const res = await auth.handler(c.req.raw);
+  // Copy status and headers from better-auth Response to Hono response
+  return new Response(res.body, {
+    status: res.status,
+    headers: res.headers,
+  });
+});
 
-// ─── API routes ───────────────────────────────────────────────────────────────
-app.route('/ingest', ingestRouter);
+// ─── Dashboard API routes (session-based auth) ────────────────────────────────
+app.use('/tenants/*', sessionMiddleware);
+app.use('/projects/*', sessionMiddleware);
+app.use('/issues/*', sessionMiddleware);
+app.use('/subscriptions/*', sessionMiddleware);
+app.use('/ai/*', sessionMiddleware);
+
 app.route('/projects', projectsRouter);
 app.route('/issues', issuesRouter);
 app.route('/tenants', tenantsRouter);
 app.route('/subscriptions', subscriptionsRouter);
 app.route('/ai', aiRouter);
+
+// ─── Ingest routes (bearer token auth) ─────────────────────────────────────────
+app.route('/ingest', ingestRouter);
 
 // ─── Global error handler ─────────────────────────────────────────────────────
 app.onError((err, c) => {

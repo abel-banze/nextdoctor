@@ -7,12 +7,13 @@ import type { AppVariables } from '../types.js';
 
 export const issuesRouter = new Hono<{ Variables: AppVariables }>();
 
-// GET /issues?projectId=&route=&severity=&limit=&offset=
+// GET /issues?projectId=&route=&severity=&id=&limit=&offset=
 issuesRouter.get('/', async (c) => {
   const tenantId = c.get('tenantId') as string;
   const projectId = c.req.query('projectId');
   const route = c.req.query('route');
   const severity = c.req.query('severity');
+  const id = c.req.query('id');
   const limit = Math.min(Number(c.req.query('limit') ?? 50), 200);
   const offset = Number(c.req.query('offset') ?? 0);
 
@@ -25,6 +26,7 @@ issuesRouter.get('/', async (c) => {
   const conditions = [eq(issues.tenantId, tenantId)];
   if (projectId) conditions.push(eq(issues.projectId, projectId));
   if (route) conditions.push(eq(issues.route, route));
+  if (id) conditions.push(eq(issues.id, id));
   if (parsedSeverity.data) conditions.push(eq(issues.severity, parsedSeverity.data));
 
   const rows = await db

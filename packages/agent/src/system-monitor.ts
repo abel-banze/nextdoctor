@@ -32,12 +32,20 @@ export interface SystemMetrics {
   uptime: number;
 }
 
+interface CPUSnapshot {
+  user: number;
+  sys: number;
+  idle: number;
+  irq: number;
+  total: number;
+}
+
 /**
  * CPU Monitor - Real-time CPU usage tracking
  */
 export class CPUMonitor {
   private static readonly SAMPLE_INTERVAL = 100; // ms
-  private lastCPUTimes: number[] = [];
+  private lastCPUSnapshots: CPUSnapshot[] = [];
   private lastSampleTime = performance.now();
   private logFn?: (level: LogLevel, message: string, meta?: any) => void;
 
@@ -48,14 +56,13 @@ export class CPUMonitor {
 
   private initializeBaseline(): void {
     const cpus_info = cpus();
-    this.lastCPUTimes = cpus_info.map((cpu) => {
-      return (
-        cpu.times.user +
-        cpu.times.sys +
-        cpu.times.idle +
-        cpu.times.irq
-      );
-    });
+    this.lastCPUSnapshots = cpus_info.map((cpu) => ({
+      user: cpu.times.user,
+      sys: cpu.times.sys,
+      idle: cpu.times.idle,
+      irq: cpu.times.irq,
+      total: cpu.times.user + cpu.times.sys + cpu.times.idle + cpu.times.irq,
+    }));
   }
 
   /**
@@ -70,23 +77,32 @@ export class CPUMonitor {
     let totalUsage = 0;
     
     cpus_info.forEach((cpu, index) => {
-      const currentTime = 
-        cpu.times.user +
-        cpu.times.sys +
-        cpu.times.idle +
-        cpu.times.irq;
-      
-      const lastTime = this.lastCPUTimes[index] || currentTime;
-      const timeDiff = currentTime - lastTime;
-      
-      if (timeDiff > 0) {
-        const userTime = cpu.times.user - (this.lastCPUTimes[index] || 0);
-        const systemTime = cpu.times.sys - (this.lastCPUTimes[index] || 0);
-        const usage = ((userTime + systemTime) / timeDiff) * 100;
-        totalUsage += Math.min(100, Math.max(0, usage));
-      }
-      
-      this.lastCPUTimes[index] = currentTime;
+      const currentTotal = cpu.times.user + cpu.times.sys + cpu.times.idle + cpu.times.irq;
+      const prev = this.lastCPUSnapshots[index] ?? {
+        user: cpu.times.user,
+        sys: cpu.times.sys,
+        idle: cpu.times.idle,
+        irq: cpu.times.irq,
+        total: currentTotal,
+      };
+
+      const totalDiff = currentTotal - prev.total;
+      const userDiff = cpu.times.user - prev.user;
+      const sysDiff = cpu.times.sys - prev.sys;
+
+      const usage = totalDiff > 0
+        ? ((userDiff + sysDiff) / totalDiff) * 100
+        : 0;
+
+      totalUsage += Math.min(100, Math.max(0, usage));
+
+      this.lastCPUSnapshots[index] = {
+        user: cpu.times.user,
+        sys: cpu.times.sys,
+        idle: cpu.times.idle,
+        irq: cpu.times.irq,
+        total: currentTotal,
+      };
     });
 
     const averageUsage = totalUsage / coreCount;

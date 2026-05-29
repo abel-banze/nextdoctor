@@ -11,10 +11,15 @@ export const tenantsRouter = new Hono<{ Variables: AppVariables }>();
 // GET /me — return the current authenticated user + tenant + plan
 tenantsRouter.get('/me', async (c) => {
   const tenantId = c.get('tenantId') as string | undefined;
-  const userId = c.get('userId') as string | undefined; // set by Better Auth session middleware
+  const userId = c.get('userId') as string | undefined; // set by session middleware
 
+  // If no tenant yet (onboarding), return user info without tenant
   if (!tenantId) {
-    return c.json({ error: 'Not authenticated' }, 401);
+    if (!userId) {
+      return c.json({ error: 'Not authenticated' }, 401);
+    }
+    const [u] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+    return c.json({ tenant: null, subscription: null, user: u ?? null });
   }
 
   const [tenant] = await db
@@ -50,6 +55,11 @@ tenantsRouter.post(
     if (!result.success) return c.json({ error: result.error.flatten() }, 400);
   }),
   async (c) => {
+    const userId = c.get('userId') as string | undefined;
+    if (!userId) {
+      return c.json({ error: 'Not authenticated' }, 401);
+    }
+
     const { name, slug } = c.req.valid('json');
 
     // Check slug uniqueness
@@ -74,6 +84,15 @@ tenantsRouter.post(
       plan: 'free',
       status: 'active',
     });
+
+    // Associate the user with the new tenant
+    await db
+      .update(users)
+      .set({ tenantId: tenant!.id, role: 'owner' })
+      .where(eq(users.id, userId));
+
+    // Set tenantId on context for subsequent requests
+    c.set('tenantId', tenant!.id);
 
     return c.json({ tenant }, 201);
   }

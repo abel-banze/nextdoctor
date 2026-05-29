@@ -29,7 +29,7 @@ export interface ExporterConfig {
 
 export interface NextDoctorConfig {
   projectToken: string;
-  endpoint: string;
+  endpoint?: string;
   enabled?: boolean;
   serviceName?: string;
   version?: string;
@@ -44,6 +44,7 @@ export interface NextDoctorConfig {
   enableDebugLogging?: boolean;
   timeout?: number; // ms
   modules?: AgentModules;
+  piiSanitization?: PiiSanitizationConfig;
 }
 
 export interface AgentModules {
@@ -51,6 +52,12 @@ export interface AgentModules {
   profiling?: boolean;
   rsc?: boolean;
   client?: boolean;
+}
+
+export interface PiiSanitizationConfig {
+  enabled: boolean;
+  redactAttributes?: string[];  // e.g. ['http.url', 'db.statement']
+  redactPattern?: RegExp;       // e.g. /email=[\w@.]+/
 }
 
 export interface DetectedIssue {

@@ -1,6 +1,7 @@
 import { Geist, Geist_Mono } from "next/font/google";
 import "@workspace/ui/globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
+import { Toaster } from "sonner";
 import { cn } from "@workspace/ui/lib/utils";
 import type { Metadata } from "next";
 
@@ -31,7 +32,10 @@ export default function RootLayout({
       className={cn("antialiased", geistSans.variable, geistMono.variable)}
     >
       <body className="min-h-screen bg-background font-sans text-foreground">
-        <ThemeProvider>{children}</ThemeProvider>
+        <ThemeProvider>
+          {children}
+          <Toaster richColors position="top-center" />
+        </ThemeProvider>
       </body>
     </html>
   );

@@ -1,6 +1,7 @@
 import type { ExportResult } from '@opentelemetry/core';
 import type { SpanExporter, ReadableSpan } from '@opentelemetry/sdk-trace-base';
 import type { DetectedIssue, DetectorContext } from './detectors/types.js';
+import type { PiiSanitizationConfig } from './types.js';
 import { CircuitBreaker } from './optimization.js';
 
 export interface NextDoctorExporterOptions {
@@ -13,6 +14,7 @@ export interface NextDoctorExporterOptions {
   /** Called to get the current detection context (route, runtime) */
   getContext: () => DetectorContext;
   timeoutMs?: number;
+  piiSanitization?: PiiSanitizationConfig;
 }
 
 /**
@@ -32,6 +34,7 @@ export class NextDoctorExporter implements SpanExporter {
   private readonly clearIssues: (sent: DetectedIssue[]) => void;
   private readonly getContext: () => DetectorContext;
   private readonly timeoutMs: number;
+  private readonly piiSanitization?: PiiSanitizationConfig;
   private isShutdown = false;
   private circuitBreaker = new CircuitBreaker();
 
@@ -42,6 +45,7 @@ export class NextDoctorExporter implements SpanExporter {
     this.clearIssues = opts.clearIssues;
     this.getContext = opts.getContext;
     this.timeoutMs = opts.timeoutMs ?? 10_000;
+    this.piiSanitization = opts.piiSanitization;
   }
 
   export(
@@ -64,7 +68,7 @@ export class NextDoctorExporter implements SpanExporter {
     const context = this.getContext();
 
     const payload = {
-      spans: spans.map(serializeSpan),
+      spans: spans.map(s => serializeSpan(s, this.piiSanitization)),
       context: {
         route: context.route,
         runtime: context.runtime,
@@ -119,10 +123,35 @@ export class NextDoctorExporter implements SpanExporter {
 // ─── Span serialiser ──────────────────────────────────────────────────────────
 // Converts an OTel ReadableSpan to the lightweight JSON the collector expects.
 
-function serializeSpan(span: ReadableSpan): object {
+function sanitizeAttributes(
+  attributes: Record<string, unknown>,
+  config: PiiSanitizationConfig,
+): Record<string, unknown> {
+  if (!config.enabled) return attributes;
+
+  const result: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(attributes)) {
+    let sanitized: unknown = value;
+
+    if (config.redactAttributes?.includes(key)) {
+      sanitized = '[REDACTED]';
+    } else if (config.redactPattern && typeof value === 'string') {
+      sanitized = value.replace(config.redactPattern, '[REDACTED]');
+    }
+
+    result[key] = sanitized;
+  }
+  return result;
+}
+
+function serializeSpan(span: ReadableSpan, piiConfig?: PiiSanitizationConfig): object {
   const ctx = span.spanContext();
   const [startSec, startNano] = span.startTime;
   const [endSec, endNano] = span.endTime;
+
+  const attributes = piiConfig?.enabled
+    ? sanitizeAttributes(span.attributes as Record<string, unknown>, piiConfig)
+    : span.attributes;
 
   return {
     traceId: ctx.traceId,
@@ -135,7 +164,7 @@ function serializeSpan(span: ReadableSpan): object {
     durationMs: Math.round(
       (endSec - startSec) * 1000 + (endNano - startNano) / 1_000_000
     ),
-    attributes: span.attributes,
+    attributes,
     status: span.status,
     events: span.events,
     links: span.links,

@@ -21,18 +21,20 @@ NextDoctor is **not** a generic monitoring tool. It is a debugger that natively 
 ```
 nextdoctor/
 ├── apps/
-│   ├── web/           # Dashboard UI (Next.js + Tailwind) — deployed to app.nextdoctor.dev
-│   ├── api/           # Backend: trace ingestion, analysis, auth — deployed separately
-│   └── marketing/     # Landing page (Next.js) — deployed to nextdoctor.dev
+│   ├── collector/     # Backend Hono: ingest de spans, auth, AI Doctor
+│   ├── dashboard/     # Dashboard Next.js (em desenvolvimento)
+│   └── web/           # Landing page (em desenvolvimento)
 │
 ├── packages/
-│   ├── cli/           # `npx nextdoctor init` — published to npm as `nextdoctor`
-│   ├── agent/         # OTel agent injected into user's Next.js app — published as `@nextdoctor/agent`
-│   └── shared/        # Shared TypeScript types, constants, utilities
+│   ├── agent/         # @codebaz/nextdoctor-agent — publicado no npm
+│   ├── nextdoctor-cli/ # @codebaz/nextdoctor — CLI de inicialização
+│   ├── ui/            # Componentes UI partilhados
+│   ├── eslint-config/ # Configuração ESLint partilhada
+│   └── typescript-config/ # Configuração TypeScript partilhada
 │
 ├── turbo.json
 ├── pnpm-workspace.yaml
-└── PROJECT.md         # ← you are here
+└── README.md
 ```
 
 ### Why packages/ and not apps/ for the CLI?
@@ -40,7 +42,7 @@ nextdoctor/
 - `apps/` = things you **deploy** (web servers, frontends)
 - `packages/` = things you **publish and consume** externally (npm packages)
 
-The CLI (`nextdoctor`) and the agent (`@nextdoctor/agent`) are installed in the **user's project**, not deployed by us. They belong in `packages/`.
+The CLI (`@codebaz/nextdoctor`) and the agent (`@codebaz/nextdoctor-agent`) are installed in the **user's project**, not deployed by us. They belong in `packages/`.
 
 ---
 
@@ -61,15 +63,10 @@ The CLI (`nextdoctor`) and the agent (`@nextdoctor/agent`) are installed in the 
 - Responsibilities:
   - Capture OpenTelemetry traces scoped to Next.js primitives
   - Detect anti-patterns at runtime (see Detection Rules below)
-  - Send trace data to `apps/api` (or local endpoint if self-hosted)
+  - Send trace data to `apps/collector` (or local endpoint if self-hosted)
 - Published as: `@codebaz/nextdoctor-agent` on npm
 - Runtime: Node.js + Edge Runtime compatible
 - Must be **zero-dependency** or near-zero to avoid bloating the user's bundle
-
-### `packages/shared`
-- Shared TypeScript types used across CLI, agent, API, and dashboard
-- No runtime logic — types and constants only
-- Not published to npm (internal only)
 
 ### `apps/collector`
 - Receives trace payloads from agents in production
@@ -80,7 +77,7 @@ The CLI (`nextdoctor`) and the agent (`@nextdoctor/agent`) are installed in the 
 
 ### `apps/dashboard`
 - Dashboard: displays diagnoses, route performance, fix suggestions
-- Real-time updates via WebSocket from `apps/api`
+- Real-time updates via WebSocket from `apps/collector`
 - Auth: project token login (MVP)
 
 ### `apps/web`

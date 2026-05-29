@@ -5,6 +5,8 @@ import { db } from '../db/index.js';
 import { aiAnalyses, issues, githubConnections } from '../db/schema.js';
 import { fetchGitHubFile, decryptToken } from './github.js';
 
+const AI_DOCTOR_MODEL = process.env.AI_DOCTOR_MODEL ?? 'claude-sonnet-4-5';
+
 export type AiDoctorInput = {
   issueId: string;
   projectId: string;
@@ -53,7 +55,7 @@ export async function runAiDoctor(input: AiDoctorInput): Promise<void> {
     projectId,
     tenantId,
     githubConnectionId: connection.id,
-    model: 'claude-sonnet-4-5',
+    model: AI_DOCTOR_MODEL,
     status: 'pending',
   }).returning();
 
@@ -80,7 +82,7 @@ export async function runAiDoctor(input: AiDoctorInput): Promise<void> {
     const userPrompt = buildUserPrompt({ issue, file });
 
     const { text, usage } = await generateText({
-      model: anthropic('claude-sonnet-4-5'),
+      model: anthropic(AI_DOCTOR_MODEL),
       system: systemPrompt,
       prompt: userPrompt,
       maxOutputTokens: 2048,
@@ -118,22 +120,33 @@ export async function runAiDoctor(input: AiDoctorInput): Promise<void> {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const NUMERIC_PATTERN = /^\d+$/;
+
+function normalizeSegment(segment: string): string {
+  if (NUMERIC_PATTERN.test(segment) || UUID_PATTERN.test(segment)) {
+    return '[id]';
+  }
+  return segment;
+}
+
 /**
  * Map a Next.js route to its most likely App Router source file.
  * Heuristic-based — works for standard Next.js 13+ App Router layouts.
+ * Numeric and UUID segments are normalized to [id] to match dynamic routes.
  */
 function routeToFilePath(route: string | null): string {
   if (!route) return 'app/page.tsx';
 
   const clean = route.replace(/^\//, '').replace(/\/$/, '');
+  const segments = clean.split('/').map(normalizeSegment);
+  const normalized = segments.join('/');
 
-  // API routes → route.ts
-  if (clean.startsWith('api/')) {
-    return `app/${clean}/route.ts`;
+  if (normalized.startsWith('api/')) {
+    return `app/${normalized}/route.ts`;
   }
 
-  // Everything else → page.tsx
-  return clean ? `app/${clean}/page.tsx` : 'app/page.tsx';
+  return normalized ? `app/${normalized}/page.tsx` : 'app/page.tsx';
 }
 
 function buildSystemPrompt(): string {
