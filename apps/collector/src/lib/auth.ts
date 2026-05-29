@@ -30,6 +30,14 @@ export const auth = betterAuth({
     enabled: true,
   },
   advanced: {
+    ...(env.NODE_ENV === 'production'
+      ? {
+          crossSubDomainCookies: {
+            enabled: true,
+            domain: '.codebaz.cloud',
+          },
+        }
+      : {}),
     defaultCookieAttributes: {
       sameSite: 'none',
       secure: true,
