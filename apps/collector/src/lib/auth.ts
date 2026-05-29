@@ -30,7 +30,7 @@ export const auth = betterAuth({
     enabled: true,
   },
   socialProviders,
-  trustedOrigins: ['http://localhost:3000', 'https://app.nextdoctor.dev'],
+  trustedOrigins: ['http://localhost:3000', 'https://api-nextdoctor.codebaz.cloud', 'https://nextdoctor.codebaz.cloud'],
 });
 
 export type Auth = typeof auth;
