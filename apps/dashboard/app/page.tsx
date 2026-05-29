@@ -1,5 +1,3 @@
-import { Button } from "@workspace/ui/components/button";
-
 export default function Home() {
   return (
     <div className="flex min-h-screen w-full flex-col items-center justify-center bg-muted/40 p-6 md:p-10">
@@ -14,12 +12,12 @@ export default function Home() {
         </div>
         
         <div className="flex flex-wrap justify-center gap-4">
-          <Button size="lg" className="px-8">
+          <a href="/projects" className="inline-flex h-9 items-center justify-center rounded-lg bg-primary px-8 text-sm font-medium text-primary-foreground transition-all hover:bg-primary/80">
             Ver Projetos
-          </Button>
-          <Button variant="outline" size="lg" className="px-8">
-            Configurações
-          </Button>
+          </a>
+          <a href="/projects/new" className="inline-flex h-9 items-center justify-center rounded-lg border border-input bg-background px-8 text-sm font-medium transition-all hover:bg-muted">
+            Novo Projeto
+          </a>
         </div>
 
         <div className="grid w-full grid-cols-1 gap-4 sm:grid-cols-2">
