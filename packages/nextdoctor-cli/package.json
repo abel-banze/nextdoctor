@@ -1,6 +1,6 @@
 {
   "name": "@codebaz/nextdoctor",
-  "version": "0.1.2@beta.2",
+  "version": "0.1.2-beta.2",
   "type": "module",
   "bin": {
     "nextdoctor": "./dist/index.js"
