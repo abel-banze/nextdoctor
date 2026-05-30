@@ -11,6 +11,7 @@ import {
   ChevronDown,
   ChevronRight,
   Hexagon,
+  BookOpen,
 } from "lucide-react"
 import { authClient } from "@/lib/auth-client"
 
@@ -142,6 +143,16 @@ export function DashboardSidebar({
       >
         <Plus className="size-4 shrink-0" />
         New Project
+      </Link>
+
+      <Link
+        href="/docs"
+        onClick={onClickLink}
+        data-active={isActive("/docs") || undefined}
+        className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground data-[active]:bg-sidebar-accent data-[active]:text-sidebar-accent-foreground"
+      >
+        <BookOpen className="size-4 shrink-0" />
+        Docs
       </Link>
     </>
   )
