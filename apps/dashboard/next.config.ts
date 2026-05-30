@@ -12,16 +12,20 @@ const collectorOrigin = normalizeOrigin(
 
 const nextConfig: NextConfig = {
   async rewrites() {
-    return [
-      {
-        source: "/api/:path*",
-        destination: `${collectorOrigin}/:path*`,
-      },
-      {
-        source: "/auth/:path*",
-        destination: `${collectorOrigin}/:path*`,
-      },
-    ];
+    return {
+      beforeFiles: [
+        {
+          source: "/auth/callback/:path*",
+          destination: `${collectorOrigin}/auth/callback/:path*`,
+        },
+      ],
+      afterFiles: [
+        {
+          source: "/api/:path*",
+          destination: `${collectorOrigin}/:path*`,
+        },
+      ],
+    };
   },
 };
 
