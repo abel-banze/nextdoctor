@@ -3,8 +3,12 @@ import { serve } from '@hono/node-server';
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
+import { migrate } from 'drizzle-orm/node-postgres/migrator';
+import { fileURLToPath } from 'node:url';
+import { dirname, resolve } from 'node:path';
 import { env } from './config.js';
 import { auth } from './lib/auth.js';
+import { db } from './db/index.js';
 import { ingestRouter } from './routes/ingest.js';
 import { projectsRouter } from './routes/projects.js';
 import { issuesRouter } from './routes/issues.js';
@@ -13,6 +17,9 @@ import { subscriptionsRouter } from './routes/subscriptions.js';
 import { aiRouter } from './routes/ai.js';
 import { analyticsRouter } from './routes/analytics.js';
 import { sessionMiddleware } from './middleware/session.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 const app = new Hono();
 
@@ -65,6 +72,15 @@ app.onError((err, c) => {
 });
 
 app.notFound((c) => c.json({ error: 'Not found' }, 404));
+
+// ─── Run pending migrations ───────────────────────────────────────────────────
+try {
+  const migrationsFolder = resolve(__dirname, '../drizzle');
+  await migrate(db, { migrationsFolder });
+  console.log('✅ Migrations applied');
+} catch (err) {
+  console.error('⚠️ Migration failed:', err instanceof Error ? err.message : err);
+}
 
 // ─── Start server ─────────────────────────────────────────────────────────────
 serve({ fetch: app.fetch, port: env.PORT }, (info) => {
