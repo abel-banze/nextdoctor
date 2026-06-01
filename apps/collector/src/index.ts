@@ -11,6 +11,7 @@ import { issuesRouter } from './routes/issues.js';
 import { tenantsRouter } from './routes/tenants.js';
 import { subscriptionsRouter } from './routes/subscriptions.js';
 import { aiRouter } from './routes/ai.js';
+import { analyticsRouter } from './routes/analytics.js';
 import { sessionMiddleware } from './middleware/session.js';
 
 const app = new Hono();
@@ -42,12 +43,14 @@ app.use('/projects/*', sessionMiddleware);
 app.use('/issues/*', sessionMiddleware);
 app.use('/subscriptions/*', sessionMiddleware);
 app.use('/ai/*', sessionMiddleware);
+app.use('/analytics/*', sessionMiddleware);
 
 app.route('/projects', projectsRouter);
 app.route('/issues', issuesRouter);
 app.route('/tenants', tenantsRouter);
 app.route('/subscriptions', subscriptionsRouter);
 app.route('/ai', aiRouter);
+app.route('/analytics', analyticsRouter);
 
 // ─── Ingest routes (bearer token auth) ─────────────────────────────────────────
 app.route('/ingest', ingestRouter);

@@ -15,6 +15,27 @@
       "when": 1779986604001,
       "tag": "0001_natural_drax",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1780326718691,
+      "tag": "0002_giant_betty_brant",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1780327845339,
+      "tag": "0003_mature_slyde",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1780785000000,
+      "tag": "0004_soft_visit_source",
+      "breakpoints": true
     }
   ]
 }

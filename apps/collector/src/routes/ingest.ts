@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { zValidator } from '@hono/zod-validator';
 import { db } from '../db/index.js';
-import { spans, issues } from '../db/schema.js';
+import { spans, issues, analyticsEvents } from '../db/schema.js';
 import { bearerAuth } from '../middleware/bearer-auth.js';
 import { sql } from 'drizzle-orm';
 import type { AppVariables } from '../types.js';
@@ -19,8 +19,51 @@ const SpanSchema = z.object({
   status: z.object({ code: z.number() }).optional(),
 });
 
+const AnalyticsEventSchema = z.object({
+  type: z.enum([
+    'session_start',
+    'pageview',
+    'session_end',
+    'performance',
+    'conversion',
+    'feature',
+    'form_abandonment',
+    'custom',
+  ]),
+  eventName: z.string().optional(),
+  sessionId: z.string(),
+  visitorId: z.string(),
+  url: z.string(),
+  referrer: z.string().nullable().optional(),
+  title: z.string(),
+  browser: z.string(),
+  os: z.string(),
+  device: z.string(),
+  language: z.string(),
+  utmSource: z.string().nullable().optional(),
+  utmMedium: z.string().nullable().optional(),
+  utmCampaign: z.string().nullable().optional(),
+  utmTerm: z.string().nullable().optional(),
+  utmContent: z.string().nullable().optional(),
+  visitSource: z.string().nullable().optional(),
+  durationMs: z.number().int().optional(),
+  isBounce: z.boolean().optional(),
+  lcpMs: z.number().int().optional(),
+  cls: z.number().optional(),
+  fidMs: z.number().int().optional(),
+  inpMs: z.number().int().optional(),
+  ttfbMs: z.number().int().optional(),
+  fcpMs: z.number().int().optional(),
+  domInteractiveMs: z.number().int().optional(),
+  scrollDepthPercent: z.number().int().min(0).max(100).optional(),
+  clickCount: z.number().int().optional(),
+  engagementTimeMs: z.number().int().optional(),
+  metadata: z.record(z.unknown()).optional(),
+  timestamp: z.number(),
+});
+
 const IngestPayloadSchema = z.object({
-  spans: z.array(SpanSchema).min(1).max(200),
+  spans: z.array(SpanSchema).min(1).max(200).optional(),
   context: z.object({
     route: z.string().optional(),
     runtime: z.enum(['nodejs', 'edge']).default('nodejs'),
@@ -36,6 +79,7 @@ const IngestPayloadSchema = z.object({
     attributes: z.record(z.unknown()).optional(),
     detectedAt: z.number(),
   })).optional(),
+  analytics: z.array(AnalyticsEventSchema).optional(),
 });
 
 export const ingestRouter = new Hono<{ Variables: AppVariables }>();
@@ -55,7 +99,7 @@ ingestRouter.post(
     const now = new Date();
 
     // Bulk insert spans — pre-compute indexed columns from the payload
-    if (body.spans.length > 0) {
+    if (body.spans && body.spans.length > 0) {
       await db.insert(spans).values(
         body.spans.map((span) => {
           // Pre-compute duration from HrTime tuples [sec, nano]
@@ -115,6 +159,47 @@ ingestRouter.post(
       }
     }
 
-    return c.json({ accepted: body.spans.length }, 202);
+    if (body.analytics && body.analytics.length > 0) {
+      await db.insert(analyticsEvents).values(
+        body.analytics.map((event) => ({
+          tenantId,
+          projectId,
+          sessionId: event.sessionId,
+          visitorId: event.visitorId,
+          eventType: event.type,
+          eventName: event.eventName ?? null,
+          url: event.url,
+          referrer: event.referrer ?? null,
+          title: event.title,
+          browser: event.browser,
+          os: event.os,
+          device: event.device,
+          language: event.language,
+          utmSource: event.utmSource ?? null,
+          utmMedium: event.utmMedium ?? null,
+          utmCampaign: event.utmCampaign ?? null,
+          utmTerm: event.utmTerm ?? null,
+          utmContent: event.utmContent ?? null,
+          visitSource: event.visitSource ?? null,
+          durationMs: event.durationMs ?? null,
+          isBounce: event.isBounce ?? false,
+          lcpMs: event.lcpMs ?? null,
+          cls: event.cls ?? null,
+          fidMs: event.fidMs ?? null,
+          inpMs: event.inpMs ?? null,
+          ttfbMs: event.ttfbMs ?? null,
+          fcpMs: event.fcpMs ?? null,
+          domInteractiveMs: event.domInteractiveMs ?? null,
+          scrollDepthPercent: event.scrollDepthPercent ?? null,
+          clickCount: event.clickCount ?? null,
+          engagementTimeMs: event.engagementTimeMs ?? null,
+          metadata: event.metadata ?? null,
+          timestamp: new Date(event.timestamp),
+          receivedAt: now,
+        }))
+      );
+    }
+
+    return c.json({ accepted: body.spans?.length ?? 0 }, 202);
   }
 );

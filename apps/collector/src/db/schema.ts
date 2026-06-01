@@ -5,6 +5,7 @@ import {
   timestamp,
   uuid,
   integer,
+  real,
   jsonb,
   boolean,
   index,
@@ -268,6 +269,70 @@ export const spans = pgTable('spans', {
   index('spans_route_idx').on(t.route),
   index('spans_name_idx').on(t.name),
   index('spans_runtime_idx').on(t.runtime),
+]);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ANALYTICS EVENTS
+// Browser and session analytics events from the client-side analytics component.
+// Captures pageviews, session start/end, referrer, source, browser/OS/device and bounce information.
+// ─────────────────────────────────────────────────────────────────────────────
+export const analyticsEvents = pgTable('analytics_events', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  tenantId: uuid('tenant_id')
+    .notNull()
+    .references(() => tenants.id, { onDelete: 'cascade' }),
+  projectId: uuid('project_id')
+    .notNull()
+    .references(() => projects.id, { onDelete: 'cascade' }),
+  sessionId: text('session_id').notNull(),
+  visitorId: text('visitor_id').notNull(),
+  eventType: text('event_type', {
+    enum: [
+      'session_start',
+      'pageview',
+      'session_end',
+      'performance',
+      'conversion',
+      'feature',
+      'form_abandonment',
+      'custom',
+    ],
+  }).notNull(),
+  eventName: text('event_name'),
+  url: text('url').notNull(),
+  referrer: text('referrer'),
+  title: text('title').notNull(),
+  browser: text('browser').notNull(),
+  os: text('os').notNull(),
+  device: text('device').notNull(),
+  language: text('language').notNull(),
+  utmSource: text('utm_source'),
+  utmMedium: text('utm_medium'),
+  utmCampaign: text('utm_campaign'),
+  utmTerm: text('utm_term'),
+  utmContent: text('utm_content'),
+  visitSource: text('visit_source'),
+  durationMs: integer('duration_ms'),
+  isBounce: boolean('is_bounce').notNull().default(false),
+  lcpMs: integer('lcp_ms'),
+  cls: real('cls'),
+  fidMs: integer('fid_ms'),
+  inpMs: integer('inp_ms'),
+  ttfbMs: integer('ttfb_ms'),
+  fcpMs: integer('fcp_ms'),
+  domInteractiveMs: integer('dom_interactive_ms'),
+  scrollDepthPercent: integer('scroll_depth_percent'),
+  clickCount: integer('click_count'),
+  engagementTimeMs: integer('engagement_time_ms'),
+  metadata: jsonb('metadata'),
+  timestamp: timestamp('timestamp').notNull(),
+  receivedAt: timestamp('received_at').notNull().defaultNow(),
+}, (t) => [
+  index('analytics_events_tenant_idx').on(t.tenantId),
+  index('analytics_events_project_idx').on(t.projectId),
+  index('analytics_events_session_idx').on(t.sessionId),
+  index('analytics_events_event_type_idx').on(t.eventType),
+  index('analytics_events_received_at_idx').on(t.receivedAt),
 ]);
 
 // ─────────────────────────────────────────────────────────────────────────────

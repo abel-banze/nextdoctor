@@ -30,6 +30,11 @@ export {
 } from './middleware.js';
 
 export {
+  NextDoctorProvider,
+  Analytics,
+} from './client/index.js';
+
+export {
   IntelligentSampler,
   BatchProcessor,
   CircuitBreaker,

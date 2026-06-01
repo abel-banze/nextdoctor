@@ -12,6 +12,7 @@ import {
   ChevronRight,
   Hexagon,
   BookOpen,
+  BarChart3,
 } from "lucide-react"
 import { authClient } from "@/lib/auth-client"
 
@@ -96,6 +97,16 @@ export function DashboardSidebar({
       >
         <LayoutDashboard className="size-4 shrink-0" />
         Home
+      </Link>
+
+      <Link
+        href="/analytics"
+        onClick={onClickLink}
+        data-active={isActive("/analytics") || undefined}
+        className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground data-[active]:bg-sidebar-accent data-[active]:text-sidebar-accent-foreground"
+      >
+        <BarChart3 className="size-4 shrink-0" />
+        Analytics
       </Link>
 
       <div>
