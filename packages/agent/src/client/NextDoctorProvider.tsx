@@ -3,7 +3,6 @@
 import { useEffect } from 'react';
 // @ts-expect-error next/web-vitals will be resolved by the consuming Next.js application
 import { useReportWebVitals } from 'next/web-vitals';
-import { scan, getReport } from 'react-scan';
 
 interface NextDoctorProviderProps {
   children: React.ReactNode;
@@ -53,22 +52,24 @@ export function NextDoctorProvider({
   });
 
   useEffect(() => {
-    // 1. Initialize react-scan in development
+    let reactScan: { scan: (opts: any) => void; getReport: () => any } | null = null;
+
+    // 1. Initialize react-scan in development (optional — consumer may not have it)
     if (typeof window !== 'undefined' && enableReactScan && process.env.NODE_ENV === 'development') {
-      scan({
-        enabled: true,
-        log: true, // Log to console as well
-      });
+      import('react-scan').then((mod) => {
+        reactScan = mod;
+        mod.scan({ enabled: true, log: true });
+      }).catch(() => { /* react-scan not installed — skip */ });
     }
 
     // 2. Reporting loop for react-scan
     const reportInterval = setInterval(() => {
-      if (typeof window !== 'undefined' && enableReactScan && process.env.NODE_ENV === 'development') {
-        const reportMap = getReport();
-        if (!reportMap || !(reportMap instanceof Map)) return;
+      if (typeof window !== 'undefined' && enableReactScan && process.env.NODE_ENV === 'development' && reactScan) {
+        const reportMap = reactScan.getReport();
+        if (!reportMap || !(typeof reportMap.forEach === 'function')) return;
 
         const reportArray: any[] = [];
-        reportMap.forEach((data: any, name: string) => {
+        (reportMap as any).forEach((data: any, name: string) => {
           // Only report components with more than 2 re-renders or significant time
           if (data.count > 2 || data.time > 10) {
             reportArray.push({

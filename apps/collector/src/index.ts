@@ -18,8 +18,11 @@ const app = new Hono();
 
 // ─── Global middleware ────────────────────────────────────────────────────────
 app.use('*', logger());
+
+// Reflective CORS: ingest accepts any origin (bearer auth),
+// dashboard routes accept any origin too (session auth).
 app.use('*', cors({
-  origin: ['http://localhost:3000', 'https://nextdoctor.codebaz.cloud'],
+  origin: (origin) => origin,
   credentials: true,
 }));
 
