@@ -52,8 +52,19 @@ interface CountryStat {
   count: number
 }
 
+interface WebVitals {
+  avgLcp: number
+  avgCls: number
+  avgFid: number
+  avgInp: number
+  avgTtfb: number
+  avgFcp: number
+  avgDomInteractive: number
+}
+
 interface AnalyticsData {
   overview: Overview
+  webVitals: WebVitals
   dailyStats: DailyStat[]
   topPages: TopPage[]
   trafficSources: TrafficSource[]

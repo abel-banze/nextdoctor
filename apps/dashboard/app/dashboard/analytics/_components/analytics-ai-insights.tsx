@@ -34,6 +34,16 @@ interface AnalyticsInsightsResult {
   insights: AIInsight[]
 }
 
+interface WebVitals {
+  avgLcp: number
+  avgCls: number
+  avgFid: number
+  avgInp: number
+  avgTtfb: number
+  avgFcp: number
+  avgDomInteractive: number
+}
+
 interface AnalyticsData {
   overview: {
     totalVisitors: number
@@ -42,6 +52,7 @@ interface AnalyticsData {
     bounceRate: number
     avgSessionDuration: number
   }
+  webVitals: WebVitals
   dailyStats: { date: string; visitors: number; sessions: number; pageviews: number }[]
   topPages: { url: string; count: number }[]
   trafficSources: { source: string; count: number }[]

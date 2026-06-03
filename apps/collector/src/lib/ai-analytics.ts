@@ -57,8 +57,19 @@ export interface CountryStat {
   count: number;
 }
 
+export interface WebVitals {
+  avgLcp: number;
+  avgCls: number;
+  avgFid: number;
+  avgInp: number;
+  avgTtfb: number;
+  avgFcp: number;
+  avgDomInteractive: number;
+}
+
 export interface AnalyticsData {
   overview: AnalyticsOverview;
+  webVitals: WebVitals;
   dailyStats: DailyStat[];
   topPages: TopPage[];
   trafficSources: TrafficSource[];
@@ -186,7 +197,8 @@ function buildSystemPrompt(): string {
   return `You are an expert Next.js analytics and performance engineer called "NextDoctor".
 
 Your role is to analyze web analytics data (visitors, pageviews, bounce rate, traffic sources, devices, etc.)
-and provide **actionable, specific** insights that help developers improve their application.
+and Web Vitals metrics (LCP, CLS, FID, INP, TTFB, FCP) to provide **actionable, specific** insights 
+that help developers improve their application's performance, UX, and SEO.
 
 You have access to TWO tools you can use to gather more information:
 
@@ -202,10 +214,20 @@ Guidelines:
 - Focus on insights that are DATA-DRIVEN and SPECIFIC to this project's analytics.
 - Don't give generic advice. Every insight must reference actual numbers from the data.
 - Identify the TOP 3-5 most impactful issues first, then add secondary insights.
+
+Web Vitals Analysis:
+- **LCP (Largest Contentful Paint)** - should be < 2.5s (goal). Warn if > 4s.
+- **CLS (Cumulative Layout Shift)** - should be < 0.1 (goal). Warn if > 0.25.
+- **INP (Interaction to Next Paint)** - should be < 200ms (goal). Warn if > 500ms.
+- **FID (First Input Delay)** - should be < 100ms (goal). Warn if > 300ms.
+- **TTFB (Time to First Byte)** - should be < 600ms (goal). Warn if > 1200ms.
+- **FCP (First Contentful Paint)** - should be < 1.8s (goal). Warn if > 3s.
+
+Traffic & UX Analysis:
 - If bounce rate is high (>50%), investigate what pages are affected.
 - Compare traffic sources — if one source dominates, suggest diversifying.
-- If mobile usage is high but experience differs from desktop, flag it.
-- For performance insights, use fetchUrl to check real page load metrics.
+- If mobile usage is high but performance differs from desktop, flag it.
+- Correlate performance metrics with bounce rate — slow pages may cause bounces.
 
 You MUST respond in the following JSON structure — no preamble, no text outside the JSON:
 
@@ -219,7 +241,7 @@ You MUST respond in the following JSON structure — no preamble, no text outsid
       "description": "Detailed explanation referencing specific numbers from the data",
       "suggestion": "Specific action the developer should take",
       "codeUrl": "Full GitHub URL to relevant file (if applicable) or null",
-      "metric": "Key metric this relates to (e.g. bounce_rate, pageviews, avg_session_duration)"
+      "metric": "Key metric this relates to (e.g. lcp, cls, bounce_rate)"
     }
   ]
 }`;
@@ -246,6 +268,15 @@ ${hasGitHub ? '## GitHub: Connected (you can use fetchGitHubFile tool)' : '## Gi
 - Total Pageviews: ${analytics.overview.totalPageviews}
 - Bounce Rate: ${analytics.overview.bounceRate}%
 - Avg Session Duration: ${formatDuration(analytics.overview.avgSessionDuration)}
+
+### Web Vitals (Core Web Vitals + Additional Performance Metrics)
+- **LCP (Largest Contentful Paint)**: ${analytics.webVitals.avgLcp}ms ${getVitalStatus(analytics.webVitals.avgLcp, 2500, 4000)}
+- **CLS (Cumulative Layout Shift)**: ${analytics.webVitals.avgCls.toFixed(2)} ${getVitalStatus(analytics.webVitals.avgCls * 1000, 100, 250)}
+- **INP (Interaction to Next Paint)**: ${analytics.webVitals.avgInp}ms ${getVitalStatus(analytics.webVitals.avgInp, 200, 500)}
+- **FID (First Input Delay)**: ${analytics.webVitals.avgFid}ms ${getVitalStatus(analytics.webVitals.avgFid, 100, 300)}
+- **TTFB (Time to First Byte)**: ${analytics.webVitals.avgTtfb}ms ${getVitalStatus(analytics.webVitals.avgTtfb, 600, 1200)}
+- **FCP (First Contentful Paint)**: ${analytics.webVitals.avgFcp}ms ${getVitalStatus(analytics.webVitals.avgFcp, 1800, 3000)}
+- **DOM Interactive**: ${analytics.webVitals.avgDomInteractive}ms
 
 ${homepageContent ? `### Live Homepage HTML (first 6000 chars)
 \`\`\`html
@@ -293,6 +324,12 @@ function formatDuration(ms: number): string {
   const minutes = Math.floor(seconds / 60);
   const secs = seconds % 60;
   return minutes > 0 ? `${minutes}m ${secs}s` : `${secs}s`;
+}
+
+function getVitalStatus(value: number, good: number, poor: number): string {
+  if (value <= good) return '✅ Good';
+  if (value <= poor) return '⚠️ Needs Improvement';
+  return '❌ Poor';
 }
 
 function parseAiResponse(text: string): AnalyticsInsightsResult {

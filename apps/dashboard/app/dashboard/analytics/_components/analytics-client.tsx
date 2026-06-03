@@ -34,6 +34,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { ChartLineInteractive } from "@/components/ui/chart-line-interactive"
 import { AnalyticsAiButton } from "./analytics-ai-button"
 import { AnalyticsAiSheet } from "./analytics-ai-sheet"
+import { WebVitalsCard } from "./web-vitals-card"
 import {
   Activity,
   Monitor,
@@ -115,8 +116,19 @@ interface CountryStat {
   count: number
 }
 
+interface WebVitals {
+  avgLcp: number
+  avgCls: number
+  avgFid: number
+  avgInp: number
+  avgTtfb: number
+  avgFcp: number
+  avgDomInteractive: number
+}
+
 interface AnalyticsData {
   overview: Overview
+  webVitals: WebVitals
   dailyStats: DailyStat[]
   topPages: TopPage[]
   trafficSources: TrafficSource[]
@@ -452,6 +464,9 @@ export function AnalyticsClient({
         <>
           {/* Traffic chart */}
           <ChartLineInteractive data={data.dailyStats} overview={data.overview} />
+
+          {/* Web Vitals */}
+          <WebVitalsCard webVitals={data.webVitals} />
 
           {/* Two-column layout */}
           <div className="grid gap-4 lg:grid-cols-2">

@@ -96,6 +96,15 @@ const AnalyticsInsightsRequestSchema = z.object({
       bounceRate: z.number(),
       avgSessionDuration: z.number(),
     }),
+    webVitals: z.object({
+      avgLcp: z.number(),
+      avgCls: z.number(),
+      avgFid: z.number(),
+      avgInp: z.number(),
+      avgTtfb: z.number(),
+      avgFcp: z.number(),
+      avgDomInteractive: z.number(),
+    }),
     dailyStats: z.array(z.object({
       date: z.string(),
       visitors: z.number(),

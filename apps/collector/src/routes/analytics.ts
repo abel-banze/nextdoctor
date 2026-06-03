@@ -57,6 +57,20 @@ analyticsRouter.get('/', async (c) => {
     ? Math.round(Number(overview?.totalDuration ?? 0) / sessionEnds)
     : 0;
 
+  // ── Web Vitals aggregates ──────────────────────────────────────────────────
+  const [webVitals] = await db
+    .select({
+      avgLcp: sql`ROUND(AVG(${analyticsEvents.lcpMs})::numeric, 0)::integer`,
+      avgCls: sql`ROUND(AVG(${analyticsEvents.cls})::numeric, 3)::real`,
+      avgFid: sql`ROUND(AVG(${analyticsEvents.fidMs})::numeric, 0)::integer`,
+      avgInp: sql`ROUND(AVG(${analyticsEvents.inpMs})::numeric, 0)::integer`,
+      avgTtfb: sql`ROUND(AVG(${analyticsEvents.ttfbMs})::numeric, 0)::integer`,
+      avgFcp: sql`ROUND(AVG(${analyticsEvents.fcpMs})::numeric, 0)::integer`,
+      avgDomInteractive: sql`ROUND(AVG(${analyticsEvents.domInteractiveMs})::numeric, 0)::integer`,
+    })
+    .from(analyticsEvents)
+    .where(and(...baseConditions, eq(analyticsEvents.eventType, 'performance')));
+
   // ── Daily time series ───────────────────────────────────────────────────────
   const dailyStats = await db
     .select({
@@ -153,6 +167,15 @@ analyticsRouter.get('/', async (c) => {
       totalPageviews: Number(overview?.totalPageviews ?? 0),
       bounceRate,
       avgSessionDuration,
+    },
+    webVitals: {
+      avgLcp: Number(webVitals?.avgLcp ?? 0),
+      avgCls: Number(webVitals?.avgCls ?? 0),
+      avgFid: Number(webVitals?.avgFid ?? 0),
+      avgInp: Number(webVitals?.avgInp ?? 0),
+      avgTtfb: Number(webVitals?.avgTtfb ?? 0),
+      avgFcp: Number(webVitals?.avgFcp ?? 0),
+      avgDomInteractive: Number(webVitals?.avgDomInteractive ?? 0),
     },
     dailyStats,
     topPages,
