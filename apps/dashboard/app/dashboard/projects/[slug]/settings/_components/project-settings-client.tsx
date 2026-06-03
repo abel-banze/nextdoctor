@@ -245,7 +245,7 @@ export function ProjectSettingsClient({
                       <ComboboxItem key={repo.id} value={repo.fullName}>
                         <FaGithub className="size-4 text-muted-foreground" />
                         {repo.fullName}
-                        {repo.private && (
+                        {repo.isPrivate && (
                           <span className="ml-auto text-[10px] text-muted-foreground">Private</span>
                         )}
                       </ComboboxItem>
