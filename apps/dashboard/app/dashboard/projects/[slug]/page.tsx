@@ -58,23 +58,48 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
   const { data: issuesData } = await serverFetch<IssuesResponse>(`/issues?${queryParams.toString()}`)
   const issues = issuesData?.issues ?? []
 
+  const tabs = [
+    {
+      label: "Dashboard",
+      href: `/dashboard/analytics?projectId=${project.id}`,
+    },
+    {
+      label: "Issues",
+      href: `/dashboard/projects/${slug}`,
+      active: true,
+    },
+    {
+      label: "Settings",
+      href: `/dashboard/projects/${slug}/settings`,
+    },
+  ] as const
+
   return (
     <div className="mx-auto max-w-4xl">
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Link href="/dashboard/projects" className="hover:text-foreground">Projects</Link>
-            <span>/</span>
-            <span className="text-foreground">{project.name}</span>
-          </div>
-          <h1 className="mt-1 text-2xl font-bold tracking-tight">{project.name}</h1>
+      <div className="mb-6">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Link href="/dashboard/projects" className="hover:text-foreground">Projects</Link>
+          <span>/</span>
+          <span className="text-foreground">{project.name}</span>
         </div>
-        <Link
-          href={`/dashboard/projects/${slug}/settings`}
-          className="inline-flex h-9 items-center justify-center rounded-lg border border-input bg-background px-4 text-sm font-medium transition-all hover:bg-muted"
-        >
-          Settings
-        </Link>
+        <h1 className="mt-1 text-2xl font-bold tracking-tight">{project.name}</h1>
+      </div>
+
+      {/* Project tabs */}
+      <div className="mb-6 flex items-center gap-0 border-b">
+        {tabs.map((tab) => (
+          <Link
+            key={tab.label}
+            href={tab.href}
+            className={`-mb-px border-b-2 px-4 py-3 text-sm font-medium transition-colors ${
+              "active" in tab
+                ? "border-foreground text-foreground"
+                : "border-transparent text-muted-foreground hover:border-border hover:text-foreground"
+            }`}
+          >
+            {tab.label}
+          </Link>
+        ))}
       </div>
 
       {/* Severity filter */}

@@ -32,6 +32,7 @@ import {
 } from "@/components/ui/select"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { ChartLineInteractive } from "@/components/ui/chart-line-interactive"
+import { AnalyticsAiInsights } from "./analytics-ai-insights"
 import {
   Activity,
   Monitor,
@@ -419,6 +420,11 @@ export function AnalyticsClient({
           </Select>
         </div>
       </div>
+
+      {/* AI Insights */}
+      {data && !loading && selectedProject && (
+        <AnalyticsAiInsights projectId={selectedProject} analytics={data} />
+      )}
 
       {/* Loading / Empty */}
       {!selectedProject && projects.length === 0 && !loading && (

@@ -1,5 +1,6 @@
-import { generateText } from 'ai';
+import { generateText, tool } from 'ai';
 import { anthropic } from '@ai-sdk/anthropic';
+import { z } from 'zod';
 import { eq } from 'drizzle-orm';
 import { db } from '../db/index.js';
 import { aiAnalyses, issues, githubConnections } from '../db/schema.js';
@@ -85,8 +86,28 @@ export async function runAiDoctor(input: AiDoctorInput): Promise<void> {
       model: anthropic(AI_DOCTOR_MODEL),
       system: systemPrompt,
       prompt: userPrompt,
-      maxOutputTokens: 2048,
+      maxOutputTokens: 4096,
       temperature: 0.2,
+      tools: {
+        fetchUrl: tool({
+          description: 'Fetch any public URL to look up documentation, similar issues, or best practices related to this error pattern',
+          inputSchema: z.object({
+            url: z.string().describe('The full public URL to fetch'),
+          }),
+          execute: async ({ url }) => {
+            try {
+              const res = await fetch(url, {
+                headers: { 'User-Agent': 'NextDoctor-Doctor/1.0' },
+                signal: AbortSignal.timeout(10000),
+              });
+              const text = await res.text();
+              return text.substring(0, 8000);
+            } catch (err) {
+              return `Error fetching URL: ${err instanceof Error ? err.message : String(err)}`;
+            }
+          },
+        }),
+      },
     });
 
     // Parse the structured response
@@ -156,6 +177,12 @@ You help developers fix performance anti-patterns in their Next.js App Router co
 You will be given:
 1. A detected performance issue with a message and suggestion
 2. The source file content from their GitHub repository
+
+You have access to a **fetchUrl** tool that can fetch any public URL.
+Use it to:
+- Look up documentation for Next.js APIs mentioned in the issue
+- Search for similar issues on GitHub, Stack Overflow, or Next.js discussions
+- Fetch best practices guides related to the detector pattern
 
 Your task is to analyse the code and produce a fix.
 

@@ -58,11 +58,13 @@ export function ProjectSettingsClient({
   initialTokens,
   initialGithubConnection,
   initialGithubRepositories,
+  showHeading = true,
 }: {
   project: Project
   initialTokens: Token[]
   initialGithubConnection: GithubConnection | null
   initialGithubRepositories: GithubRepository[]
+  showHeading?: boolean
 }) {
   const [tokens, setTokens] = useState<Token[]>(initialTokens)
   const [error, setError] = useState("")
@@ -199,16 +201,18 @@ export function ProjectSettingsClient({
 
   return (
     <div className="mx-auto max-w-2xl">
-      <div className="mb-6">
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Link href="/dashboard/projects" className="hover:text-foreground">Projects</Link>
-          <span>/</span>
-          <Link href={`/dashboard/projects/${project.slug}`} className="hover:text-foreground">{project.name}</Link>
-          <span>/</span>
-          <span className="text-foreground">Settings</span>
+      {showHeading && (
+        <div className="mb-6">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Link href="/dashboard/projects" className="hover:text-foreground">Projects</Link>
+            <span>/</span>
+            <Link href={`/dashboard/projects/${project.slug}`} className="hover:text-foreground">{project.name}</Link>
+            <span>/</span>
+            <span className="text-foreground">Settings</span>
+          </div>
+          <h1 className="mt-1 text-2xl font-bold tracking-tight">Project settings</h1>
         </div>
-        <h1 className="mt-1 text-2xl font-bold tracking-tight">Project settings</h1>
-      </div>
+      )}
 
       {error && (
         <div className="mb-4 flex items-center justify-between rounded-lg border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
