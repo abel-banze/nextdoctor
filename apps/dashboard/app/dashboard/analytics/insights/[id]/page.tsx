@@ -5,7 +5,7 @@ import { useParams, useSearchParams, useRouter } from "next/navigation"
 import { ArrowLeft, Copy, Check, Code } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { InsightDetailsView } from "../_components/insight-details-view"
+import { InsightDetailsView } from "../../_components/insight-details-view"
 
 const STORAGE_KEY = (projectId: string) => `ai-analyses-${projectId}`
 
