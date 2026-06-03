@@ -32,7 +32,8 @@ import {
 } from "@/components/ui/select"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { ChartLineInteractive } from "@/components/ui/chart-line-interactive"
-import { AnalyticsAiInsights } from "./analytics-ai-insights"
+import { AnalyticsAiButton } from "./analytics-ai-button"
+import { AnalyticsAiSheet } from "./analytics-ai-sheet"
 import {
   Activity,
   Monitor,
@@ -270,6 +271,7 @@ export function AnalyticsClient({
   const [sourceFilter, setSourceFilter] = useState<string>("all")
   const [data, setData] = useState<AnalyticsData | null>(initialData)
   const [loading, setLoading] = useState(false)
+  const [sheetOpen, setSheetOpen] = useState(false)
 
   const fetchAnalytics = useCallback(async () => {
     setLoading(true)
@@ -418,13 +420,18 @@ export function AnalyticsClient({
               ))}
             </SelectContent>
           </Select>
+
+          <AnalyticsAiButton onOpen={() => setSheetOpen(true)} hasAnalyses={false} />
         </div>
       </div>
 
-      {/* AI Insights */}
-      {data && !loading && selectedProject && (
-        <AnalyticsAiInsights projectId={selectedProject} analytics={data} />
-      )}
+      {/* AI Insights Sheet */}
+      <AnalyticsAiSheet
+        open={sheetOpen}
+        onOpenChange={setSheetOpen}
+        projectId={selectedProject}
+        analytics={data}
+      />
 
       {/* Loading / Empty */}
       {!selectedProject && projects.length === 0 && !loading && (
