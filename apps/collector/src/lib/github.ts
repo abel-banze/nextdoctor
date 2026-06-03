@@ -1,3 +1,4 @@
+import { createCipheriv, createDecipheriv, randomBytes } from 'crypto';
 import { env } from '../config.js';
 
 export interface GitHubFileContent {
@@ -132,7 +133,6 @@ export async function fetchGitHubFile(
  * The token is encrypted at storage time using NEXTDOCTOR_SECRET.
  */
 export async function decryptToken(encryptedHex: string): Promise<string> {
-  const { createDecipheriv } = await import('crypto').then(m => m);
   // Format: iv(32 hex chars) + ':' + authTag(32 hex chars) + ':' + ciphertext
   const [ivHex, authTagHex, cipherHex] = encryptedHex.split(':');
   if (!ivHex || !authTagHex || !cipherHex) {
@@ -148,7 +148,6 @@ export async function decryptToken(encryptedHex: string): Promise<string> {
  * Encrypt a GitHub access token for storage in the database.
  */
 export function encryptToken(rawToken: string): string {
-  const { createCipheriv, randomBytes } = require('crypto');
   const key = Buffer.from(env.NEXTDOCTOR_SECRET.slice(0, 32), 'utf8');
   const iv = randomBytes(16);
   const cipher = createCipheriv('aes-256-gcm', key, iv);
