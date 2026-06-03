@@ -646,7 +646,7 @@ export function AnalyticsClient({
                       return (
                         <div key={d.device} className="flex items-center gap-3">
                           <div className="flex size-8 shrink-0 items-center justify-center rounded-md border bg-card">
-                            <Icon className="size-4" color={color} />
+                            <span style={{ color }}><Icon className="size-4" /></span>
                           </div>
                           <div className="min-w-0 flex-1">
                             <div className="flex items-baseline justify-between gap-2">
