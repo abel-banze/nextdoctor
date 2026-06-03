@@ -289,24 +289,23 @@ export function ProjectSettingsClient({
               <FaGithub className="size-6 text-muted-foreground" />
             </div>
             <div>
-              <h3 className="font-semibold">No GitHub account connected</h3>
+              <h3 className="font-semibold">
+                {githubRepositories.length > 0 ? "No repository connected" : "No GitHub account connected"}
+              </h3>
               <p className="mt-1 text-sm text-muted-foreground">
-                Link your project to a GitHub repository to enable PR comments and deployment tracking.
+                {githubRepositories.length > 0
+                  ? "Your GitHub account is connected. Select a repository to link to this project."
+                  : "Link your project to a GitHub repository to enable PR comments and deployment tracking."}
               </p>
             </div>
-            <Button onClick={handleConnectGithubAccount} disabled={githubAccountLoading}>
-              <FaGithub className="mr-2 size-4" />
-              {githubAccountLoading ? "Connecting..." : "Connect GitHub account"}
-            </Button>
-            {githubRepositories.length > 0 && (
+            {githubRepositories.length > 0 ? (
               <div className="w-full max-w-sm">
-                <label className="mb-1.5 block text-left text-sm font-medium">Repository</label>
                 <Combobox value={selectedRepo} onValueChange={(v) => v && setSelectedRepo(v)}>
                   <ComboboxInput placeholder="Search repositories..." />
                   <ComboboxContent>
                     <ComboboxList>
                       {githubRepositories.map((repo) => (
-                        <ComboboxItem key={repo.id} value={repo.fullName}>
+                      <ComboboxItem key={repo.id} value={repo.fullName}>
                           <FaGithub className="size-4 text-muted-foreground" />
                           {repo.fullName}
                         </ComboboxItem>
@@ -319,12 +318,17 @@ export function ProjectSettingsClient({
                   onClick={handleConnectRepository}
                   disabled={!selectedRepo}
                   size="sm"
-                  className="mt-2"
+                  className="mt-2 w-full"
                 >
                   <Plus className="mr-1.5 size-4" />
                   Connect repository
                 </Button>
               </div>
+            ) : (
+              <Button onClick={handleConnectGithubAccount} disabled={githubAccountLoading}>
+                <FaGithub className="mr-2 size-4" />
+                {githubAccountLoading ? "Connecting..." : "Connect GitHub account"}
+              </Button>
             )}
           </div>
         )}
