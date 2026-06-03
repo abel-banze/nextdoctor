@@ -63,9 +63,9 @@ export default async function IssueDetailPage({ params }: PageProps) {
     <div className="mx-auto max-w-4xl">
       <div className="mb-6">
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Link href="/projects" className="hover:text-foreground">Projects</Link>
+          <Link href="/dashboard/projects" className="hover:text-foreground">Projects</Link>
           <span>/</span>
-          <Link href={`/projects/${issue.route ?? ""}`} className="hover:text-foreground">{issue.route ?? ""}</Link>
+          <Link href={`/dashboard/projects/${issue.route ?? ""}`} className="hover:text-foreground">{issue.route ?? ""}</Link>
           <span>/</span>
           <span className="text-foreground">Issue</span>
         </div>

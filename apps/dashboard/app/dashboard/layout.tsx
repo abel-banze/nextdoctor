@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation"
 import { serverFetch } from "@/lib/server-api"
 import { DashboardSidebar } from "./_components/dashboard-sidebar"
+import { DashboardHeader } from "./_components/dashboard-header"
 
 interface User {
   id: string
@@ -49,9 +50,10 @@ export default async function DashboardLayout({
   const { data: projects } = await serverFetch<Project[]>("/projects")
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex h-screen">
       <DashboardSidebar user={user} tenant={tenant} subscription={subscription} projects={projects ?? []} />
-      <div className="flex flex-1 flex-col">
+      <div className="flex flex-1 flex-col overflow-hidden md:ml-56">
+        <DashboardHeader user={user} projects={projects ?? []} />
         <main className="flex-1 overflow-y-auto p-4 md:p-6">{children}</main>
       </div>
     </div>

@@ -79,7 +79,7 @@ export default function NewProjectPage() {
 
           <button
             type="button"
-            onClick={() => router.push(`/projects/${slug}`)}
+            onClick={() => router.push(`/dashboard/projects/${slug}`)}
             className="inline-flex h-9 items-center justify-center rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground transition-all hover:bg-primary/80"
           >
             Go to project
@@ -93,7 +93,7 @@ export default function NewProjectPage() {
     <div className="mx-auto max-w-lg py-10">
       <div className="mb-6">
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Link href="/projects" className="hover:text-foreground">Projects</Link>
+          <Link href="/dashboard/projects" className="hover:text-foreground">Projects</Link>
           <span>/</span>
           <span className="text-foreground">New</span>
         </div>

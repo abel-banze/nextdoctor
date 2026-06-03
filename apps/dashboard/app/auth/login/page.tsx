@@ -27,7 +27,7 @@ export default function LoginPage() {
       return
     }
 
-    router.push("/")
+    router.push("/dashboard")
     router.refresh()
   }
 
@@ -37,7 +37,7 @@ export default function LoginPage() {
 
     const { error: err } = await authClient.signIn.social({
       provider: "github",
-      callbackURL: "/",
+      callbackURL: "/dashboard",
     })
 
     setGithubLoading(false)

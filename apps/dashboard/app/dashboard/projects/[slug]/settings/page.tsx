@@ -161,7 +161,7 @@ export default function ProjectSettingsPage({
 
     const { error } = await authClient.signIn.social({
       provider: "github",
-      callbackURL: `/projects/${slug}/settings`,
+      callbackURL: `/dashboard/projects/${slug}/settings`,
     })
 
     setGithubAccountLoading(false)
@@ -297,9 +297,9 @@ export default function ProjectSettingsPage({
     <div className="mx-auto max-w-2xl">
       <div className="mb-6">
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Link href="/projects" className="hover:text-foreground">Projects</Link>
+          <Link href="/dashboard/projects" className="hover:text-foreground">Projects</Link>
           <span>/</span>
-          <Link href={`/projects/${slug}`} className="hover:text-foreground">{project?.name}</Link>
+          <Link href={`/dashboard/projects/${slug}`} className="hover:text-foreground">{project?.name}</Link>
           <span>/</span>
           <span className="text-foreground">Settings</span>
         </div>

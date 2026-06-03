@@ -53,7 +53,7 @@ export default async function DashboardHome() {
             {projects.map((project) => (
               <Link
                 key={project.id}
-                href={`/projects/${project.slug}`}
+                href={`/dashboard/projects/${project.slug}`}
                 className="group rounded-lg border p-4 transition-colors hover:bg-accent"
               >
                 <h3 className="font-medium group-hover:text-primary">{project.name}</h3>
@@ -70,7 +70,7 @@ export default async function DashboardHome() {
           </p>
           <div className="mt-4">
             <Link
-              href="/projects/new"
+              href="/dashboard/projects/new"
               className="inline-flex h-9 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
             >
               New Project
@@ -83,7 +83,7 @@ export default async function DashboardHome() {
         <h2 className="text-lg font-semibold">Quick Links</h2>
         <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <Link
-            href="/projects/new"
+            href="/dashboard/projects/new"
             className="rounded-md border p-4 transition-colors hover:bg-accent"
           >
             <div className="font-medium">Create Project</div>

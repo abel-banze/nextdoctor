@@ -9,7 +9,7 @@ export function ProjectsEmpty() {
         <p className="text-sm text-muted-foreground">Create your first project to start monitoring.</p>
       </div>
       <Link
-        href="/projects/new"
+        href="/dashboard/projects/new"
         className="inline-flex h-9 items-center justify-center rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground transition-all hover:bg-primary/80"
       >
         Create project

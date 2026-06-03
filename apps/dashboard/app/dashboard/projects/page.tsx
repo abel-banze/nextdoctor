@@ -32,7 +32,7 @@ export default async function ProjectsPage() {
           <p className="text-sm text-muted-foreground">Manage your Next.js applications</p>
         </div>
         <Link
-          href="/projects/new"
+          href="/dashboard/projects/new"
           className="inline-flex h-9 items-center justify-center rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground transition-all hover:bg-primary/80"
         >
           New project
@@ -46,7 +46,7 @@ export default async function ProjectsPage() {
           {projects.map((project) => (
             <Link
               key={project.id}
-              href={`/projects/${project.slug}`}
+              href={`/dashboard/projects/${project.slug}`}
               className="flex items-center gap-4 rounded-xl border bg-card p-4 transition-colors hover:bg-accent/50"
             >
               <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary">

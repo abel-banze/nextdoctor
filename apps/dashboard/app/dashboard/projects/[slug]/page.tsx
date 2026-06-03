@@ -63,14 +63,14 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
       <div className="mb-6 flex items-center justify-between">
         <div>
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Link href="/projects" className="hover:text-foreground">Projects</Link>
+            <Link href="/dashboard/projects" className="hover:text-foreground">Projects</Link>
             <span>/</span>
             <span className="text-foreground">{project.name}</span>
           </div>
           <h1 className="mt-1 text-2xl font-bold tracking-tight">{project.name}</h1>
         </div>
         <Link
-          href={`/projects/${slug}/settings`}
+          href={`/dashboard/projects/${slug}/settings`}
           className="inline-flex h-9 items-center justify-center rounded-lg border border-input bg-background px-4 text-sm font-medium transition-all hover:bg-muted"
         >
           Settings
@@ -80,7 +80,7 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
       {/* Severity filter */}
       <div className="mb-4 flex items-center gap-2">
         <Link
-          href={`/projects/${slug}`}
+          href={`/dashboard/projects/${slug}`}
           className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${!severityFilter ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-muted/80"}`}
         >
           All
@@ -109,7 +109,7 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
           {issues.map((issue) => (
             <Link
               key={issue.id}
-              href={`/projects/${slug}/issues/${issue.id}`}
+              href={`/dashboard/projects/${slug}/issues/${issue.id}`}
               className="flex items-center gap-3 rounded-xl border bg-card p-4 transition-colors hover:bg-accent/50"
             >
               <div className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium capitalize ${severityColors[issue.severity]}`}>
