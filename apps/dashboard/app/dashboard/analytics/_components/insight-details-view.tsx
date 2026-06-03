@@ -232,7 +232,7 @@ export function InsightDetailsView({ insight }: Props) {
               <Button
                 onClick={handleCopy}
                 size="sm"
-                variant="ghost"
+                variant="secondary"
                 className="h-7 gap-1.5"
               >
                 {copied ? (
