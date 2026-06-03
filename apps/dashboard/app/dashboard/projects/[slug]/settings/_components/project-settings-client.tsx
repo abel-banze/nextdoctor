@@ -1,8 +1,7 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useCallback } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
 import { CopyButton } from "@/components/copy-button"
 import { Button } from "@/components/ui/button"
 import {
@@ -15,7 +14,7 @@ import {
 } from "@/components/ui/combobox"
 import { authClient } from "@/lib/auth-client"
 import { FaGithub } from "react-icons/fa"
-import { GitBranch, Plus } from "lucide-react"
+import { GitBranch, Plus, Loader2, Check } from "lucide-react"
 
 interface Project {
   id: string
@@ -65,10 +64,9 @@ export function ProjectSettingsClient({
   initialGithubConnection: GithubConnection | null
   initialGithubRepositories: GithubRepository[]
 }) {
-  const router = useRouter()
-
   const [tokens, setTokens] = useState<Token[]>(initialTokens)
   const [error, setError] = useState("")
+  const [success, setSuccess] = useState("")
   const [rotating, setRotating] = useState(false)
   const [newToken, setNewToken] = useState<string | null>(null)
   const [githubConnection, setGithubConnection] = useState<GithubConnection | null>(initialGithubConnection)
@@ -88,6 +86,16 @@ export function ProjectSettingsClient({
     return repo?.fullName ?? selectedRepo
   }, [selectedRepo, githubRepositories])
 
+  const showError = useCallback((msg: string) => {
+    setSuccess("")
+    setError(msg)
+  }, [])
+
+  const showSuccess = useCallback((msg: string) => {
+    setError("")
+    setSuccess(msg)
+  }, [])
+
   async function handleConnectGithubAccount() {
     setGithubAccountLoading(true)
     const { error: err } = await authClient.signIn.social({
@@ -95,13 +103,18 @@ export function ProjectSettingsClient({
       callbackURL: `/dashboard/projects/${project.slug}/settings`,
     })
     setGithubAccountLoading(false)
-    if (err) setError(err.message ?? "Failed to connect GitHub")
+    if (err) showError(err.message ?? "Failed to connect GitHub")
   }
 
   async function handleConnectRepository() {
     const repository = githubRepositories.find((repo) => repo.fullName === selectedRepo)
-    if (!repository) return
+    if (!repository) {
+      showError("Selected repository not found. Try searching again.")
+      return
+    }
     setGithubConnectLoading(true)
+    setError("")
+    setSuccess("")
     try {
       const res = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/projects/${project.id}/github`,
@@ -114,13 +127,14 @@ export function ProjectSettingsClient({
       )
       const data = await res.json()
       if (!res.ok) {
-        setError(data.error ?? "Failed to connect repository")
+        showError(data.error ?? "Failed to connect repository")
         return
       }
       setGithubConnection(data.connection)
       setSelectedRepo(`${data.connection.repoOwner}/${data.connection.repoName}`)
+      showSuccess(`Repository connected successfully`)
     } catch {
-      setError("Connection error. Is the collector running?")
+      showError("Connection error. Is the collector running?")
     } finally {
       setGithubConnectLoading(false)
     }
@@ -128,6 +142,8 @@ export function ProjectSettingsClient({
 
   async function handleDisconnectRepository() {
     setGithubDisconnectLoading(true)
+    setError("")
+    setSuccess("")
     try {
       const res = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/projects/${project.id}/github`,
@@ -135,13 +151,14 @@ export function ProjectSettingsClient({
       )
       const data = await res.json()
       if (!res.ok) {
-        setError(data.error ?? "Failed to disconnect repository")
+        showError(data.error ?? "Failed to disconnect repository")
         return
       }
       setGithubConnection(null)
       setSelectedRepo("")
+      showSuccess("Repository disconnected")
     } catch {
-      setError("Connection error. Is the collector running?")
+      showError("Connection error. Is the collector running?")
     } finally {
       setGithubDisconnectLoading(false)
     }
@@ -150,6 +167,7 @@ export function ProjectSettingsClient({
   async function handleRotate() {
     setRotating(true)
     setNewToken(null)
+    setError("")
     try {
       const res = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/projects/${project.id}/tokens`,
@@ -157,7 +175,7 @@ export function ProjectSettingsClient({
       )
       if (!res.ok) {
         const data = await res.json()
-        setError(data.error ?? "Failed to rotate token")
+        showError(data.error ?? "Failed to rotate token")
         setRotating(false)
         return
       }
@@ -172,10 +190,12 @@ export function ProjectSettingsClient({
         setTokens(tokensData.tokens ?? [])
       }
     } catch {
-      setError("Connection error")
+      showError("Connection error")
     }
     setRotating(false)
   }
+
+  const hasGithubAccount = githubRepositories.length > 0
 
   return (
     <div className="mx-auto max-w-2xl">
@@ -194,6 +214,16 @@ export function ProjectSettingsClient({
         <div className="mb-4 flex items-center justify-between rounded-lg border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
           <span>{error}</span>
           <button type="button" onClick={() => setError("")} className="font-medium hover:underline">Dismiss</button>
+        </div>
+      )}
+
+      {success && (
+        <div className="mb-4 flex items-center justify-between rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800 dark:border-green-900/50 dark:bg-green-950/30 dark:text-green-300">
+          <span className="flex items-center gap-1.5">
+            <Check className="size-4" />
+            {success}
+          </span>
+          <button type="button" onClick={() => setSuccess("")} className="font-medium hover:underline">Dismiss</button>
         </div>
       )}
 
@@ -262,7 +292,9 @@ export function ProjectSettingsClient({
                 disabled={githubConnectLoading || !selectedRepo || selectedRepo === currentRepoLabel}
                 size="sm"
               >
-                {githubConnectLoading ? "Saving..." : "Save"}
+                {githubConnectLoading ? (
+                  <><Loader2 className="mr-1.5 size-3.5 animate-spin" />Saving...</>
+                ) : "Save"}
               </Button>
               <Button
                 onClick={handleDisconnectRepository}
@@ -270,7 +302,9 @@ export function ProjectSettingsClient({
                 variant="outline"
                 size="sm"
               >
-                {githubDisconnectLoading ? "Disconnecting..." : "Disconnect"}
+                {githubDisconnectLoading ? (
+                  <><Loader2 className="mr-1.5 size-3.5 animate-spin" />Disconnecting...</>
+                ) : "Disconnect"}
               </Button>
               <Button
                 onClick={handleConnectGithubAccount}
@@ -279,33 +313,41 @@ export function ProjectSettingsClient({
                 size="sm"
                 className="ml-auto"
               >
-                {githubAccountLoading ? "Connecting..." : "Reconnect GitHub"}
+                {githubAccountLoading ? (
+                  <><Loader2 className="mr-1.5 size-3.5 animate-spin" />Connecting...</>
+                ) : "Reconnect GitHub"}
               </Button>
             </div>
           </div>
         ) : (
           <div className="flex flex-col items-center gap-4 rounded-xl border border-dashed bg-card px-6 py-10 text-center">
+            {hasGithubAccount && (
+              <div className="mb-1 flex items-center gap-2 rounded-full bg-green-50 px-3 py-1 text-xs font-medium text-green-700 dark:bg-green-950/30 dark:text-green-400">
+                <Check className="size-3.5" />
+                GitHub account connected
+              </div>
+            )}
             <div className="flex size-12 items-center justify-center rounded-full bg-muted">
               <FaGithub className="size-6 text-muted-foreground" />
             </div>
             <div>
               <h3 className="font-semibold">
-                {githubRepositories.length > 0 ? "No repository connected" : "No GitHub account connected"}
+                {hasGithubAccount ? "No repository connected" : "No GitHub account connected"}
               </h3>
               <p className="mt-1 text-sm text-muted-foreground">
-                {githubRepositories.length > 0
-                  ? "Your GitHub account is connected. Select a repository to link to this project."
+                {hasGithubAccount
+                  ? "Your GitHub account is connected. Select a repository below to link it to this project."
                   : "Link your project to a GitHub repository to enable PR comments and deployment tracking."}
               </p>
             </div>
-            {githubRepositories.length > 0 ? (
-              <div className="w-full max-w-sm">
+            {hasGithubAccount ? (
+              <div className="w-full max-w-sm space-y-3">
                 <Combobox value={selectedRepo} onValueChange={(v) => v && setSelectedRepo(v)}>
                   <ComboboxInput placeholder="Search repositories..." />
                   <ComboboxContent>
                     <ComboboxList>
                       {githubRepositories.map((repo) => (
-                      <ComboboxItem key={repo.id} value={repo.fullName}>
+                        <ComboboxItem key={repo.id} value={repo.fullName}>
                           <FaGithub className="size-4 text-muted-foreground" />
                           {repo.fullName}
                         </ComboboxItem>
@@ -316,18 +358,24 @@ export function ProjectSettingsClient({
                 </Combobox>
                 <Button
                   onClick={handleConnectRepository}
-                  disabled={!selectedRepo}
+                  disabled={!selectedRepo || githubConnectLoading}
                   size="sm"
-                  className="mt-2 w-full"
+                  className="w-full"
                 >
-                  <Plus className="mr-1.5 size-4" />
-                  Connect repository
+                  {githubConnectLoading ? (
+                    <><Loader2 className="mr-1.5 size-3.5 animate-spin" />Connecting...</>
+                  ) : (
+                    <><Plus className="mr-1.5 size-4" />Connect repository</>
+                  )}
                 </Button>
               </div>
             ) : (
               <Button onClick={handleConnectGithubAccount} disabled={githubAccountLoading}>
-                <FaGithub className="mr-2 size-4" />
-                {githubAccountLoading ? "Connecting..." : "Connect GitHub account"}
+                {githubAccountLoading ? (
+                  <><Loader2 className="mr-1.5 size-3.5 animate-spin" />Connecting...</>
+                ) : (
+                  <><FaGithub className="mr-2 size-4" />Connect GitHub account</>
+                )}
               </Button>
             )}
           </div>
@@ -339,7 +387,9 @@ export function ProjectSettingsClient({
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-lg font-semibold">API tokens</h2>
           <Button onClick={handleRotate} disabled={rotating} variant="outline" size="sm">
-            {rotating ? "Rotating..." : "Rotate all tokens"}
+            {rotating ? (
+              <><Loader2 className="mr-1.5 size-3.5 animate-spin" />Rotating...</>
+            ) : "Rotate all tokens"}
           </Button>
         </div>
 
